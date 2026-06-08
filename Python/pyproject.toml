@@ -1,0 +1,24 @@
+[project]
+name = "diocese-cert-manager"
+version = "1.0.0"
+description = "Diocese of Madurai Ramnad CSI — certificate data entry and overlay printing"
+readme = "README.md"
+# Must stay on 3.8.x — last Python that supports Windows 7.
+requires-python = ">=3.8,<3.9"
+dependencies = [
+    "customtkinter==5.2.2",
+    "darkdetect==0.8.0",
+    "pywin32==306; sys_platform == 'win32'",
+    "Pillow==9.5.0",
+    "nuitka>=1.9.7",
+    "ordered-set>=4.1.0",
+]
+
+[project.optional-dependencies]
+build = [
+    "nuitka==1.9.7",
+    "ordered-set==4.1.0",
+]
+
+[project.scripts]
+diocese-cert-manager = "main:main"

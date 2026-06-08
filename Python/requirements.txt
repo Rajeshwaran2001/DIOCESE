@@ -1,0 +1,11 @@
+# Diocese Certificate Manager — runtime + build dependencies
+# Pinned to versions that still support Python 3.8 / Windows 7.
+
+customtkinter==5.2.2     # modern themed widgets (draws its own UI)
+darkdetect==0.8.0        # pulled in by customtkinter; pinned for reproducibility
+pywin32==306             # win32print / win32ui / win32con for GDI printing (Windows only)
+Pillow==9.5.0            # logo image loading in the sidebar (last 3.8-friendly line)
+
+# Build-time only (not imported at runtime):
+nuitka==1.9.7            # compiles Python -> C -> native standalone build
+ordered-set==4.1.0       # speeds up Nuitka
