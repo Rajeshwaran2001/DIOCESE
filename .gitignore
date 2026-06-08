@@ -1,0 +1,15 @@
+# Build outputs
+/DioceseCerts.exe
+/cmd/diocesecerts/resource.syso
+/installer/Output/
+
+# Local data / config produced at runtime
+/config.json
+/diocese.db
+/diocese.db-wal
+/diocese.db-shm
+
+# Editor / OS noise
+*.exe~
+.DS_Store
+Thumbs.db
