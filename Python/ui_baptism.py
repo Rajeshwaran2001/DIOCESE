@@ -67,9 +67,16 @@ class BaptismSection(ctk.CTkFrame):
         self.fields = {}
         self.editing_id = None
 
+        # The entry form is large (~1s to build), so it is created lazily on the
+        # first Add/Edit. Opening the section to view the list stays instant.
+        self.entry_view = None
+
         self._build_list_view()
-        self._build_entry_view()
         self._show("List")
+
+    def _ensure_entry_view(self):
+        if self.entry_view is None:
+            self._build_entry_view()
 
     def _build_list_view(self):
         self.list_view = RecordTable(
@@ -139,7 +146,8 @@ class BaptismSection(ctk.CTkFrame):
                          ).pack(side="left", padx=8)
 
     def _show(self, which):
-        self.entry_view.pack_forget()
+        if self.entry_view is not None:
+            self.entry_view.pack_forget()
         self.list_view.pack_forget()
         if which == "Entry":
             self.entry_view.pack(fill="both", expand=True)
@@ -148,6 +156,7 @@ class BaptismSection(ctk.CTkFrame):
             self.list_view.pack(fill="both", expand=True)
 
     def _add_new(self):
+        self._ensure_entry_view()
         self._clear()
         self.entry_title.configure(text="New Baptism Certificate")
         self._show("Entry")
@@ -196,6 +205,7 @@ class BaptismSection(ctk.CTkFrame):
         rec = self.app.db.get_baptism(rec_id)
         if not rec:
             return
+        self._ensure_entry_view()
         for key, w in self.fields.items():
             w.set(rec.get(key, ""))
         self.editing_id = rec_id

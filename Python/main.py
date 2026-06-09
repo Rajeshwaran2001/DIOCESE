@@ -119,13 +119,24 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _prewarm_sections(self):
-        """Construct the remaining sections in the background (one per idle tick)."""
+        """Build the remaining sections AND their (heavy) entry forms in the
+        background, one step per idle tick, so the first click on any nav item
+        or on Add/Edit is instant instead of pausing ~1s to construct widgets.
+        """
+        # Step 1: make sure every section object exists.
         pending = [n for n in ("marriage", "baptism", "settings")
                    if n not in self.sections]
-        if not pending:
+        if pending:
+            self._get_section(pending[0])
+            self.after(60, self._prewarm_sections)
             return
-        self._get_section(pending[0])   # build one section now
-        self.after(60, self._prewarm_sections)  # schedule the next
+        # Step 2: pre-build each record section's lazy entry form.
+        for name in ("death", "marriage", "baptism"):
+            section = self.sections.get(name)
+            if section is not None and getattr(section, "entry_view", True) is None:
+                section._ensure_entry_view()
+                self.after(60, self._prewarm_sections)
+                return
 
     # ------------------------------------------------------------------ #
     # Database lifecycle

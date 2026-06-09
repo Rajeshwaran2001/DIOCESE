@@ -77,21 +77,25 @@ class MarriageSection(ctk.CTkFrame):
         self.party_b = {}
         self.editing_id = None
 
+        # The entry form holds dozens of widgets and costs ~1s to build, so it
+        # is created lazily on the first Add/Edit instead of up front. This keeps
+        # opening the section (the common case — viewing the list) instant.
+        self.entry_view = None
+
         self._build_list_view()
-        self._build_entry_view()
         self._show("List")
 
+    def _ensure_entry_view(self):
+        if self.entry_view is None:
+            self._build_entry_view()
+
     def _fetch_records(self, query):
-        """Search, then enrich each row with party A/B display names for columns."""
+        """Search. The DB query already returns party A/B display names, so we
+        only normalise blanks to a dash here (no per-row get_marriage() call)."""
         records = self.app.db.search_marriage(query) or []
         for rec in records:
-            full = self.app.db.get_marriage(rec["id"]) or {}
-            parties = full.get("parties", {})
-            a, b = parties.get("A", {}), parties.get("B", {})
-            rec["party_a_name"] = " ".join(
-                x for x in [a.get("name_of_party"), a.get("surname")] if x) or "—"
-            rec["party_b_name"] = " ".join(
-                x for x in [b.get("name_of_party"), b.get("surname")] if x) or "—"
+            rec["party_a_name"] = (rec.get("party_a_name") or "").strip() or "—"
+            rec["party_b_name"] = (rec.get("party_b_name") or "").strip() or "—"
         return records
 
     def _build_list_view(self):
@@ -197,7 +201,8 @@ class MarriageSection(ctk.CTkFrame):
                          ).pack(side="left", padx=8)
 
     def _show(self, which):
-        self.entry_view.pack_forget()
+        if self.entry_view is not None:
+            self.entry_view.pack_forget()
         self.list_view.pack_forget()
         if which == "Entry":
             self.entry_view.pack(fill="both", expand=True)
@@ -206,6 +211,7 @@ class MarriageSection(ctk.CTkFrame):
             self.list_view.pack(fill="both", expand=True)
 
     def _add_new(self):
+        self._ensure_entry_view()
         self._clear()
         self.entry_title.configure(text="New Marriage Return")
         self._show("Entry")
@@ -274,6 +280,7 @@ class MarriageSection(ctk.CTkFrame):
         rec = self.app.db.get_marriage(rec_id)
         if not rec:
             return
+        self._ensure_entry_view()
         for k, w in self.shared.items():
             w.set(rec.get(k, ""))
         a = rec.get("parties", {}).get("A", {})

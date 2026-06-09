@@ -69,9 +69,16 @@ class DeathSection(ctk.CTkFrame):
         self.fields = {}
         self.editing_id = None
 
+        # The entry form is large (~1s to build), so it is created lazily on the
+        # first Add/Edit. Opening the section to view the list stays instant.
+        self.entry_view = None
+
         self._build_list_view()
-        self._build_entry_view()
         self._show("List")   # list/grid is the default screen
+
+    def _ensure_entry_view(self):
+        if self.entry_view is None:
+            self._build_entry_view()
 
     # ------------------------------------------------------------------ #
     def _build_list_view(self):
@@ -145,7 +152,8 @@ class DeathSection(ctk.CTkFrame):
 
     # ------------------------------------------------------------------ #
     def _show(self, which):
-        self.entry_view.pack_forget()
+        if self.entry_view is not None:
+            self.entry_view.pack_forget()
         self.list_view.pack_forget()
         if which == "Entry":
             self.entry_view.pack(fill="both", expand=True)
@@ -155,6 +163,7 @@ class DeathSection(ctk.CTkFrame):
 
     def _add_new(self):
         """Open a blank entry form for a new record."""
+        self._ensure_entry_view()
         self._clear()
         self.entry_title.configure(text="New Death Extract")
         self._show("Entry")
@@ -211,6 +220,7 @@ class DeathSection(ctk.CTkFrame):
         rec = self.app.db.get_death(rec_id)
         if not rec:
             return
+        self._ensure_entry_view()
         self._load(rec)
         self.editing_id = rec_id
         self.entry_title.configure(text="Edit Death Extract #{}".format(rec_id))

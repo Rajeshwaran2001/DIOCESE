@@ -451,7 +451,9 @@ class RecordTable(ctk.CTkFrame):
         self.search = ctk.CTkEntry(bar, placeholder_text=search_placeholder,
                                    font=LABEL_FONT, height=38, corner_radius=CORNER)
         self.search.pack(side="left", fill="x", expand=True)
-        self.search.bind("<KeyRelease>", lambda e: self.refresh())
+        # Debounce typing: rebuild only after the user pauses, so each keystroke
+        # doesn't trigger a full DB query + row re-render (which felt laggy).
+        self.search.bind("<KeyRelease>", lambda e: self._debounce(self.refresh))
 
         self.year_var = ctk.StringVar(value="All years")
         self.year_menu = ctk.CTkOptionMenu(
@@ -478,13 +480,13 @@ class RecordTable(ctk.CTkFrame):
         self.from_entry = ctk.CTkEntry(range_row, placeholder_text="dd/mm/yyyy",
                                        font=SMALL_FONT, width=120, height=34)
         self.from_entry.pack(side="left", padx=(4, 12))
-        self.from_entry.bind("<KeyRelease>", lambda e: self._apply_filters())
+        self.from_entry.bind("<KeyRelease>", lambda e: self._debounce(self._apply_filters))
         ctk.CTkLabel(range_row, text="To", font=SMALL_FONT,
                      text_color=GRID_TEXT_DIM).pack(side="left")
         self.to_entry = ctk.CTkEntry(range_row, placeholder_text="dd/mm/yyyy",
                                      font=SMALL_FONT, width=120, height=34)
         self.to_entry.pack(side="left", padx=(4, 0))
-        self.to_entry.bind("<KeyRelease>", lambda e: self._apply_filters())
+        self.to_entry.bind("<KeyRelease>", lambda e: self._debounce(self._apply_filters))
         self.count_label = ctk.CTkLabel(range_row, text="", font=SMALL_FONT,
                                         text_color=GRID_TEXT_DIM)
         self.count_label.pack(side="right")
@@ -509,6 +511,18 @@ class RecordTable(ctk.CTkFrame):
         self.rows.pack(fill="both", expand=True, padx=PAD, pady=(6, PAD))
 
         self._all = []  # last fetched (unfiltered-by-client) records
+        self._debounce_id = None   # pending after() id for debounced rebuilds
+        self._row_pool = []        # reusable row widgets (avoid rebuild churn)
+
+    # ------------------------------------------------------------------ #
+    def _debounce(self, fn, delay_ms=220):
+        """Coalesce rapid events (typing) into a single deferred call to ``fn``."""
+        if self._debounce_id is not None:
+            try:
+                self.after_cancel(self._debounce_id)
+            except Exception:
+                pass
+        self._debounce_id = self.after(delay_ms, fn)
 
     # ------------------------------------------------------------------ #
     @staticmethod
@@ -587,38 +601,70 @@ class RecordTable(ctk.CTkFrame):
         self.refresh()
 
     def _render(self, rows):
-        for child in self.rows.winfo_children():
-            child.destroy()
+        """Render rows by REUSING pooled widgets instead of destroying and
+        rebuilding them every time. Creating CTkButtons is expensive, so this
+        keeps filtering/typing snappy: existing rows just get new text +
+        rebound commands; new rows are built only when the list grows; surplus
+        rows are hidden (and kept for next time)."""
         self.count_label.configure(text="{} record{}".format(
             len(rows), "" if len(rows) == 1 else "s"))
-        if not rows:
-            ctk.CTkLabel(self.rows, text="No records found.", font=LABEL_FONT,
-                         text_color="gray").pack(pady=24)
-            return
-        for i, rec in enumerate(rows):
-            self._render_row(rec, i)
 
-    def _render_row(self, rec, index):
-        bg = ROW_BG if index % 2 == 0 else ROW_ALT_BG
-        row = ctk.CTkFrame(self.rows, fg_color=bg, corner_radius=8)
-        row.pack(fill="x", pady=2)
-        for c, (_label, key, weight) in enumerate(self.columns):
-            row.grid_columnconfigure(c, weight=weight, uniform="col")
-            text = str(rec.get(key) or "—")
-            ctk.CTkLabel(row, text=text, font=LABEL_FONT, anchor="w",
-                         justify="left").grid(row=0, column=c, sticky="ew",
-                                              padx=PAD, pady=10)
+        # Empty-state label (created lazily, hidden when there are rows).
+        if not hasattr(self, "_empty_label"):
+            self._empty_label = ctk.CTkLabel(
+                self.rows, text="No records found.", font=LABEL_FONT,
+                text_color="gray")
+        if not rows:
+            for r in self._row_pool:
+                r["frame"].pack_forget()
+            self._empty_label.pack(pady=24)
+            return
+        self._empty_label.pack_forget()
+
+        # Grow the pool if needed.
+        while len(self._row_pool) < len(rows):
+            self._row_pool.append(self._build_pooled_row())
+
+        for i, rec in enumerate(rows):
+            self._fill_pooled_row(self._row_pool[i], rec, i)
+            self._row_pool[i]["frame"].pack(fill="x", pady=2)
+
+        # Hide any leftover rows from a previous, longer result set.
+        for r in self._row_pool[len(rows):]:
+            r["frame"].pack_forget()
+
+    def _build_pooled_row(self):
+        """Create one reusable row widget (frame + cell labels + action buttons)."""
+        frame = ctk.CTkFrame(self.rows, corner_radius=8)
+        cells = []
+        for c, (_label, _key, weight) in enumerate(self.columns):
+            frame.grid_columnconfigure(c, weight=weight, uniform="col")
+            lbl = ctk.CTkLabel(frame, text="", font=LABEL_FONT, anchor="w",
+                               justify="left")
+            lbl.grid(row=0, column=c, sticky="ew", padx=PAD, pady=10)
+            cells.append(lbl)
         actions_col = len(self.columns)
-        row.grid_columnconfigure(actions_col, weight=0)
-        btns = ctk.CTkFrame(row, fg_color="transparent")
+        frame.grid_columnconfigure(actions_col, weight=0)
+        btns = ctk.CTkFrame(frame, fg_color="transparent")
         btns.grid(row=0, column=actions_col, sticky="e", padx=(0, 8))
+        edit = primary_button(btns, "Edit", font=SMALL_FONT, width=70, height=32)
+        edit.pack(side="left", padx=3)
+        reprint = secondary_button(btns, "Reprint", font=SMALL_FONT, width=80, height=32)
+        reprint.pack(side="left", padx=3)
+        delete = secondary_button(btns, "Delete", font=SMALL_FONT, width=72, height=32)
+        delete.pack(side="left", padx=3)
+        return {"frame": frame, "cells": cells,
+                "edit": edit, "reprint": reprint, "delete": delete}
+
+    def _fill_pooled_row(self, row, rec, index):
+        """Update a pooled row's text, stripe colour and button commands."""
+        row["frame"].configure(fg_color=ROW_BG if index % 2 == 0 else ROW_ALT_BG)
+        for lbl, (_label, key, _weight) in zip(row["cells"], self.columns):
+            lbl.configure(text=str(rec.get(key) or "—"))
         rec_id = rec["id"]
-        primary_button(btns, "Edit", command=lambda i=rec_id: self._on_edit(i),
-                       font=SMALL_FONT, width=70, height=32).pack(side="left", padx=3)
-        secondary_button(btns, "Reprint", command=lambda i=rec_id: self._on_reprint(i),
-                         font=SMALL_FONT, width=80, height=32).pack(side="left", padx=3)
-        secondary_button(btns, "Delete", command=lambda i=rec_id: self._on_delete(i),
-                         font=SMALL_FONT, width=72, height=32).pack(side="left", padx=3)
+        row["edit"].configure(command=lambda i=rec_id: self._on_edit(i))
+        row["reprint"].configure(command=lambda i=rec_id: self._on_reprint(i))
+        row["delete"].configure(command=lambda i=rec_id: self._on_delete(i))
 
 
 # --------------------------------------------------------------------------- #

@@ -271,8 +271,24 @@ class Database:
 
     def search_marriage(self, query=""):
         like = "%{}%".format(query.strip())
+        # Pull each party's display name in the SAME query (correlated
+        # subqueries) so the list view doesn't have to call get_marriage() once
+        # per row (an N+1 that made the marriage list feel slow).
         rows = self.conn.execute(
-            """SELECT mr.* FROM marriage_return mr
+            """SELECT mr.*,
+                   TRIM(COALESCE((SELECT a.name_of_party FROM marriage_party a
+                                  WHERE a.marriage_id = mr.id AND a.side = 'A'), '')
+                     || ' ' ||
+                        COALESCE((SELECT a.surname FROM marriage_party a
+                                  WHERE a.marriage_id = mr.id AND a.side = 'A'), ''))
+                     AS party_a_name,
+                   TRIM(COALESCE((SELECT b.name_of_party FROM marriage_party b
+                                  WHERE b.marriage_id = mr.id AND b.side = 'B'), '')
+                     || ' ' ||
+                        COALESCE((SELECT b.surname FROM marriage_party b
+                                  WHERE b.marriage_id = mr.id AND b.side = 'B'), ''))
+                     AS party_b_name
+               FROM marriage_return mr
                LEFT JOIN marriage_party mp ON mp.marriage_id = mr.id
                WHERE mr.number LIKE ? OR mr.serial_no LIKE ?
                   OR mr.when_married LIKE ? OR mp.name_of_party LIKE ?
