@@ -110,7 +110,22 @@ class App(ctk.CTk):
         self._build_layout()
         self.show_section("death")
 
+        # Pre-build the other sections once the window is on screen and idle, so
+        # the first click on Marriage / Baptism / Settings is instant instead of
+        # pausing to construct their (large) forms. Staggered so the UI stays
+        # responsive while they build.
+        self.after(120, self._prewarm_sections)
+
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _prewarm_sections(self):
+        """Construct the remaining sections in the background (one per idle tick)."""
+        pending = [n for n in ("marriage", "baptism", "settings")
+                   if n not in self.sections]
+        if not pending:
+            return
+        self._get_section(pending[0])   # build one section now
+        self.after(60, self._prewarm_sections)  # schedule the next
 
     # ------------------------------------------------------------------ #
     # Database lifecycle
@@ -265,9 +280,13 @@ class App(ctk.CTk):
     # ------------------------------------------------------------------ #
     def show_section(self, name):
         section = self._get_section(name)
-        if self.current is not None:
-            self.current.grid_forget()
-        section.grid(row=0, column=0, sticky="nsew", padx=18, pady=18)
+        if section is self.current:
+            return
+        # All sections share the SAME grid cell and stay gridded; switching is
+        # just a Z-order change (tkraise). Nothing is un-gridded, so the content
+        # frame never relayouts or blanks — this removes the switch flicker that
+        # grid/grid_remove caused.
+        section.tkraise()
         self.current = section
         self._highlight_nav(name)
 
@@ -279,7 +298,14 @@ class App(ctk.CTk):
                 "baptism": BaptismSection,
                 "settings": SettingsSection,
             }[name]
-            self.sections[name] = factory(self.content, self)
+            section = factory(self.content, self)
+            # Grid it once into the shared cell, then push it BELOW the current
+            # section so building extra sections (e.g. during prewarm) never
+            # covers the one the user is looking at.
+            section.grid(row=0, column=0, sticky="nsew", padx=18, pady=18)
+            if self.current is not None:
+                section.lower(self.current)
+            self.sections[name] = section
         return self.sections[name]
 
     def _highlight_nav(self, active):

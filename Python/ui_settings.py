@@ -20,6 +20,7 @@ from ui_common import (
     Card, show_success, show_error, show_info, confirm,
     TITLE_FONT, HEADING_FONT, BUTTON_FONT, LABEL_FONT, SMALL_FONT,
     CORNER, PAD,
+    primary_button, secondary_button,
 )
 
 _ACCENTS = ["blue", "green", "dark-blue"]
@@ -196,15 +197,13 @@ class SettingsSection(ctk.CTkFrame):
             y_entry.pack(side="left")
             self.cal_entries[form_key] = (x_entry, y_entry)
 
-            ctk.CTkButton(row, text="Save", font=SMALL_FONT, width=70, height=34,
-                          corner_radius=CORNER,
-                          command=lambda f=form_key: self._save_cal(f)
-                          ).pack(side="left", padx=(10, 4))
-            ctk.CTkButton(row, text="Alignment Test", font=SMALL_FONT, width=130,
-                          height=34, corner_radius=CORNER, fg_color="transparent",
-                          border_width=1,
-                          command=lambda f=form_key: self._alignment_test(f)
-                          ).pack(side="left", padx=4, pady=PAD)
+            primary_button(row, "Save", command=lambda f=form_key: self._save_cal(f),
+                           font=SMALL_FONT, width=70, height=34
+                           ).pack(side="left", padx=(10, 4))
+            secondary_button(row, "Alignment Test",
+                             command=lambda f=form_key: self._alignment_test(f),
+                             font=SMALL_FONT, width=130, height=34
+                             ).pack(side="left", padx=4, pady=PAD)
 
     def _save_cal(self, form_key):
         x_entry, y_entry = self.cal_entries[form_key]

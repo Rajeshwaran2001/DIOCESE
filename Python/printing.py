@@ -44,11 +44,19 @@ class PrinterError(Exception):
 # Printer discovery
 # --------------------------------------------------------------------------- #
 def get_printers():
-    """Return a list of installed printer names (empty if printing unavailable)."""
+    """Return a list of installed printer names (empty if printing unavailable).
+
+    Tolerant of a stopped/disabled Print Spooler service (EnumPrinters then
+    raises RPC error 1722); we return an empty list instead of crashing the
+    Settings screen, so the app still opens on machines with no spooler running.
+    """
     if not PRINTING_AVAILABLE:
         return []
     flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-    printers = win32print.EnumPrinters(flags)
+    try:
+        printers = win32print.EnumPrinters(flags)
+    except Exception:
+        return []
     # Each entry: (flags, description, name, comment)
     return [p[2] for p in printers]
 

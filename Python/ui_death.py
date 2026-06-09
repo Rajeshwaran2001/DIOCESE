@@ -9,40 +9,43 @@ import customtkinter as ctk
 
 import printing
 from ui_common import (
-    LabeledEntry, Card, PreviewWindow,
+    LabeledEntry, DatePicker, Card, PreviewWindow, RecordTable,
     show_success, show_error, show_warning, confirm,
     validate_record, TITLE_FONT, HEADING_FONT, BUTTON_FONT, SMALL_FONT,
-    LABEL_FONT, CORNER, PAD,
+    LABEL_FONT, CORNER, PAD, FONT_FAMILY,
+    primary_button, secondary_button,
 )
 
 
-# (field_key, label, required) grouped into cards.
-_GROUPS = [
-    ("Reference", [
-        ("serial_no", "S.No.", False),
-        ("number", "Number", True),
-    ]),
-    ("Deceased details", [
-        ("name_of_dead_person", "Name of Dead Person", True),
-        ("age", "Age", False),
-        ("occupation", "Occupation", False),
-        ("family_relation", "Family Relation", False),
-        ("cause_of_death", "Cause of Death", False),
-    ]),
-    ("Dates & places", [
-        ("date_of_death", "Date of Death", False),
-        ("date_of_burial", "Date of Burial", False),
-        ("place_of_death", "Place of Death", False),
-        ("place_of_burial", "Place of Burial", False),
-        ("person_who_buried_body", "Person Who Buried the Body", False),
-    ]),
-    ("Certificate paragraph & footer", [
-        ("registrar_name", "Diocesan Registrar Name", False),
-        ("pastorate_name", "Pastorate Name", False),
-        ("witness_date", "Witness Date (day of ___)", False),
-        ("prepared_by", "Prepared By", False),
-        ("checked_by", "Checked By", False),
-    ]),
+# The entry form follows the order of the actual pre-printed Death Extract sheet:
+# NUMBER, DATE OF DEATH, DATE OF BURIAL, NAME OF DEAD PERSON, AGE, OCCUPATION,
+# CAUSE OF DEATH, FAMILY RELATION, PLACE OF DEATH, PERSON WHO BURIED THE BODY,
+# PLACE OF BURIAL, then the closing certificate paragraph + footer.
+# ("S.No." is pre-printed, so it is omitted.)
+
+# (field_key, label, required, is_date) in sheet order, shown as a label-left /
+# value-right list to mirror the printed form.
+_SHEET_FIELDS = [
+    ("number",                 "Number",                    True,  False),
+    ("date_of_death",          "Date of Death",             False, True),
+    ("date_of_burial",         "Date of Burial",            False, True),
+    ("name_of_dead_person",    "Name of Dead Person",       True,  False),
+    ("age",                    "Age",                       False, False),
+    ("occupation",             "Occupation",                False, False),
+    ("cause_of_death",         "Cause of Death",            False, False),
+    ("family_relation",        "Family Relation",           False, False),
+    ("place_of_death",         "Place of Death",            False, False),
+    ("person_who_buried_body", "Person Who Buried the Body", False, False),
+    ("place_of_burial",        "Place of Burial",           False, False),
+]
+
+# Closing certificate paragraph + footer.
+_FOOTER = [
+    ("registrar_name", "Diocesan Registrar Name", False),
+    ("pastorate_name", "Pastorate Name", False),
+    ("witness_date", "Witness Date (day of ___)", False),
+    ("prepared_by", "Prepared By", False),
+    ("checked_by", "Checked By", False),
 ]
 
 _REQUIRED = [("number", "Number"), ("name_of_dead_person", "Name of Dead Person")]
@@ -52,89 +55,109 @@ _DATES = [("date_of_death", "Date of Death"), ("date_of_burial", "Date of Burial
 class DeathSection(ctk.CTkFrame):
     form_type = "death"
 
+    # Columns shown in the list/grid: (header, record_key, weight).
+    _COLUMNS = [
+        ("Name", "name_of_dead_person", 3),
+        ("No.", "number", 1),
+        ("Date of Death", "date_of_death", 2),
+        ("Place of Death", "place_of_death", 2),
+    ]
+
     def __init__(self, parent, app):
         super().__init__(parent, fg_color="transparent")
         self.app = app
         self.fields = {}
         self.editing_id = None
 
-        self._build_header()
+        self._build_list_view()
         self._build_entry_view()
-        self._build_history_view()
-        self._show("Entry")
+        self._show("List")   # list/grid is the default screen
 
     # ------------------------------------------------------------------ #
-    def _build_header(self):
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(fill="x", padx=PAD, pady=(PAD, 0))
-        ctk.CTkLabel(bar, text="Death Extract", font=TITLE_FONT).pack(side="left")
-        self.switch = ctk.CTkSegmentedButton(
-            bar, values=["Entry", "History"], font=BUTTON_FONT,
-            command=self._show,
+    def _build_list_view(self):
+        self.list_view = RecordTable(
+            self,
+            title="Death Extracts",
+            add_label="＋  Add New",
+            columns=self._COLUMNS,
+            date_key="date_of_death",
+            fetch=lambda q: self.app.db.search_death(q),
+            on_add=self._add_new,
+            on_edit=self._edit,
+            on_reprint=lambda i: self._print(self.app.db.get_death(i)),
+            on_delete=self._delete,
+            search_placeholder="Search name / number / date...",
         )
-        self.switch.set("Entry")
-        self.switch.pack(side="right")
 
     # ------------------------------------------------------------------ #
     def _build_entry_view(self):
         self.entry_view = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        for title, fields in _GROUPS:
-            card = Card(self.entry_view, title=title)
-            card.pack(fill="x", padx=PAD, pady=(PAD, 0))
-            grid = ctk.CTkFrame(card, fg_color="transparent")
-            grid.pack(fill="x", padx=PAD, pady=(0, PAD))
-            for i, (key, label, required) in enumerate(fields):
-                col = i % 2
-                row = i // 2
-                grid.grid_columnconfigure(col, weight=1)
-                widget = LabeledEntry(grid, label, required=required)
-                widget.grid(row=row, column=col, sticky="ew", padx=8, pady=8)
-                self.fields[key] = widget
+        # Entry header: a back link + title, so the user can return to the list.
+        head = ctk.CTkFrame(self.entry_view, fg_color="transparent")
+        head.pack(fill="x", padx=PAD, pady=(PAD, 0))
+        secondary_button(head, "←  Back to list", command=lambda: self._show("List"),
+                         font=SMALL_FONT, width=140, height=36).pack(side="left")
+        self.entry_title = ctk.CTkLabel(head, text="New Death Extract", font=TITLE_FONT)
+        self.entry_title.pack(side="left", padx=(12, 0))
+
+        # A single card laid out like the real Death Extract sheet: a left LABEL
+        # column and a right VALUE column, in the exact order of the printed form.
+        sheet = Card(self.entry_view, title="Death Extract")
+        sheet.pack(fill="x", padx=PAD, pady=(PAD, 0))
+        grid = ctk.CTkFrame(sheet, fg_color="transparent")
+        grid.pack(fill="x", padx=PAD, pady=(0, PAD))
+        grid.grid_columnconfigure(0, weight=0, minsize=240)   # label column
+        grid.grid_columnconfigure(1, weight=1)                # value column
+
+        for r, (key, label, required, is_date) in enumerate(_SHEET_FIELDS):
+            ctk.CTkLabel(grid, text=label + ("  *" if required else ""),
+                         font=(FONT_FAMILY, 13, "bold"), anchor="w",
+                         justify="left", wraplength=220).grid(
+                row=r, column=0, sticky="w", padx=(4, 12), pady=6)
+            cls = DatePicker if is_date else LabeledEntry
+            widget = cls(grid, "")          # label sits in the left cell
+            widget.label.pack_forget()
+            widget.grid(row=r, column=1, sticky="ew", pady=4)
+            self.fields[key] = widget
+
+        # Closing certificate paragraph + footer.
+        footer_card = Card(self.entry_view, title="Certificate paragraph & footer")
+        footer_card.pack(fill="x", padx=PAD, pady=(PAD, 0))
+        fgrid = ctk.CTkFrame(footer_card, fg_color="transparent")
+        fgrid.pack(fill="x", padx=PAD, pady=(0, PAD))
+        for i, (key, label, required) in enumerate(_FOOTER):
+            col, r = i % 2, i // 2
+            fgrid.grid_columnconfigure(col, weight=1)
+            widget = LabeledEntry(fgrid, label, required=required)
+            widget.grid(row=r, column=col, sticky="ew", padx=8, pady=8)
+            self.fields[key] = widget
 
         actions = ctk.CTkFrame(self.entry_view, fg_color="transparent")
         actions.pack(fill="x", padx=PAD, pady=PAD)
-        ctk.CTkButton(actions, text="Save", font=BUTTON_FONT, height=42,
-                      corner_radius=CORNER, command=lambda: self._save(False)
-                      ).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(actions, text="Save & Print", font=BUTTON_FONT, height=42,
-                      corner_radius=CORNER, command=lambda: self._save(True)
-                      ).pack(side="left", padx=8)
-        ctk.CTkButton(actions, text="Preview", font=BUTTON_FONT, height=42,
-                      corner_radius=CORNER, fg_color="transparent", border_width=1,
-                      command=self._preview).pack(side="left", padx=8)
-        ctk.CTkButton(actions, text="Clear", font=BUTTON_FONT, height=42,
-                      corner_radius=CORNER, fg_color="transparent", border_width=1,
-                      command=self._clear).pack(side="left", padx=8)
-        self.edit_banner = ctk.CTkLabel(actions, text="", font=SMALL_FONT,
-                                        text_color="#D97706")
-        self.edit_banner.pack(side="right")
-
-    # ------------------------------------------------------------------ #
-    def _build_history_view(self):
-        self.history_view = ctk.CTkFrame(self, fg_color="transparent")
-        top = ctk.CTkFrame(self.history_view, fg_color="transparent")
-        top.pack(fill="x", padx=PAD, pady=PAD)
-        self.search = ctk.CTkEntry(top, placeholder_text="Search name / number / date...",
-                                   font=LABEL_FONT, height=40, corner_radius=CORNER)
-        self.search.pack(side="left", fill="x", expand=True)
-        self.search.bind("<KeyRelease>", lambda e: self._refresh_history())
-        ctk.CTkButton(top, text="Refresh", font=BUTTON_FONT, width=100, height=40,
-                      corner_radius=CORNER, command=self._refresh_history
-                      ).pack(side="left", padx=(8, 0))
-
-        self.rows = ctk.CTkScrollableFrame(self.history_view, fg_color="transparent")
-        self.rows.pack(fill="both", expand=True, padx=PAD, pady=(0, PAD))
+        primary_button(actions, "Save", command=lambda: self._save(False)
+                       ).pack(side="left", padx=(0, 8))
+        primary_button(actions, "Save & Print", command=lambda: self._save(True)
+                       ).pack(side="left", padx=8)
+        secondary_button(actions, "Preview", command=self._preview
+                         ).pack(side="left", padx=8)
+        secondary_button(actions, "Clear", command=self._clear
+                         ).pack(side="left", padx=8)
 
     # ------------------------------------------------------------------ #
     def _show(self, which):
         self.entry_view.pack_forget()
-        self.history_view.pack_forget()
+        self.list_view.pack_forget()
         if which == "Entry":
             self.entry_view.pack(fill="both", expand=True)
         else:
-            self._refresh_history()
-            self.history_view.pack(fill="both", expand=True)
-        self.switch.set(which)
+            self.list_view.refresh()
+            self.list_view.pack(fill="both", expand=True)
+
+    def _add_new(self):
+        """Open a blank entry form for a new record."""
+        self._clear()
+        self.entry_title.configure(text="New Death Extract")
+        self._show("Entry")
 
     # ------------------------------------------------------------------ #
     def _collect(self):
@@ -148,7 +171,6 @@ class DeathSection(ctk.CTkFrame):
         for w in self.fields.values():
             w.clear()
         self.editing_id = None
-        self.edit_banner.configure(text="")
 
     # ------------------------------------------------------------------ #
     def _save(self, print_after):
@@ -173,6 +195,7 @@ class DeathSection(ctk.CTkFrame):
 
         show_success(self, "Saved", "Death extract saved successfully.")
         self._clear()
+        self._show("List")   # back to the grid after saving
 
     def _preview(self):
         PreviewWindow(self, self.form_type, self._collect(), self.app.config)
@@ -184,57 +207,13 @@ class DeathSection(ctk.CTkFrame):
             show_error(self, "Printing problem", str(exc))
 
     # ------------------------------------------------------------------ #
-    def _refresh_history(self):
-        for child in self.rows.winfo_children():
-            child.destroy()
-        try:
-            records = self.app.db.search_death(self.search.get())
-        except Exception as exc:
-            show_error(self, "Database error", str(exc))
-            return
-        if not records:
-            ctk.CTkLabel(self.rows, text="No records found.", font=LABEL_FONT,
-                         text_color="gray").pack(pady=20)
-            return
-        for rec in records:
-            self._row_card(rec)
-
-    def _row_card(self, rec):
-        card = ctk.CTkFrame(self.rows, corner_radius=CORNER)
-        card.pack(fill="x", pady=6)
-        info = ctk.CTkFrame(card, fg_color="transparent")
-        info.pack(side="left", fill="x", expand=True, padx=PAD, pady=PAD)
-        title = "{}  (No. {})".format(rec.get("name_of_dead_person") or "—",
-                                      rec.get("number") or "—")
-        ctk.CTkLabel(info, text=title, font=HEADING_FONT, anchor="w").pack(fill="x")
-        sub = "S.No {}  ·  Died {}  ·  Buried {}".format(
-            rec.get("serial_no") or "—", rec.get("date_of_death") or "—",
-            rec.get("date_of_burial") or "—")
-        ctk.CTkLabel(info, text=sub, font=SMALL_FONT, anchor="w",
-                     text_color="gray").pack(fill="x")
-
-        btns = ctk.CTkFrame(card, fg_color="transparent")
-        btns.pack(side="right", padx=PAD, pady=PAD)
-        for label, cmd, primary in [
-            ("Edit", lambda: self._edit(rec["id"]), True),
-            ("Reprint", lambda: self._print(self.app.db.get_death(rec["id"])), False),
-            ("Delete", lambda: self._delete(rec["id"]), False),
-        ]:
-            ctk.CTkButton(
-                btns, text=label, font=SMALL_FONT, width=84, height=34,
-                corner_radius=CORNER,
-                fg_color=None if primary else "transparent",
-                border_width=0 if primary else 1,
-                command=cmd,
-            ).pack(side="left", padx=4)
-
     def _edit(self, rec_id):
         rec = self.app.db.get_death(rec_id)
         if not rec:
             return
         self._load(rec)
         self.editing_id = rec_id
-        self.edit_banner.configure(text="Editing record #{}".format(rec_id))
+        self.entry_title.configure(text="Edit Death Extract #{}".format(rec_id))
         self._show("Entry")
 
     def _delete(self, rec_id):
@@ -246,4 +225,4 @@ class DeathSection(ctk.CTkFrame):
         except Exception as exc:
             show_error(self, "Database error", str(exc))
             return
-        self._refresh_history()
+        self.list_view.refresh()
