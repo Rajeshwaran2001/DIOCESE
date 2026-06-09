@@ -38,11 +38,16 @@ func newDeathSection(app *App) *deathSection {
 	return &deathSection{app: app, model: &stringTableModel{}}
 }
 
-func (s *deathSection) Page() TabPage {
-	return TabPage{
-		Title:  "Death",
-		Layout: VBox{},
+// Widget renders the Death section into a Composite whose visibility the
+// sidebar toggles. assignTo receives the Composite so App.navTo can show/hide it.
+func (s *deathSection) Widget(assignTo **walk.Composite) Composite {
+	return Composite{
+		AssignTo:      assignTo,
+		Visible:       false,
+		StretchFactor: 1,
+		Layout:        VBox{Spacing: 8},
 		Children: []Widget{
+			sectionTitle("Death Extract"),
 			TabWidget{
 				Pages: []TabPage{
 					s.entryPage(),
@@ -146,6 +151,7 @@ func (s *deathSection) historyPage() TabPage {
 				AssignTo:         &s.tv,
 				AlternatingRowBG: true,
 				ColumnsOrderable: true,
+				Font:             tableFont,
 				Model:            s.model,
 				OnItemActivated:  s.onView, // double-click
 				Columns: []TableViewColumn{

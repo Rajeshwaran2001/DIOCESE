@@ -36,11 +36,16 @@ func newBaptismSection(app *App) *baptismSection {
 	return &baptismSection{app: app, model: &stringTableModel{}}
 }
 
-func (s *baptismSection) Page() TabPage {
-	return TabPage{
-		Title:  "model.Baptism",
-		Layout: VBox{},
+// Widget renders the Baptism section into a Composite whose visibility the
+// sidebar toggles.
+func (s *baptismSection) Widget(assignTo **walk.Composite) Composite {
+	return Composite{
+		AssignTo:      assignTo,
+		Visible:       false,
+		StretchFactor: 1,
+		Layout:        VBox{Spacing: 8},
 		Children: []Widget{
+			sectionTitle("Baptism Certificate"),
 			TabWidget{
 				Pages: []TabPage{
 					s.entryPage(),
@@ -141,6 +146,7 @@ func (s *baptismSection) historyPage() TabPage {
 			TableView{
 				AssignTo:         &s.tv,
 				AlternatingRowBG: true,
+				Font:             tableFont,
 				Model:            s.model,
 				OnItemActivated:  s.onView,
 				Columns: []TableViewColumn{
@@ -241,7 +247,7 @@ func (s *baptismSection) onSave(print bool) {
 			return
 		}
 	}
-	s.app.infoBox("Saved", "model.Baptism certificate saved successfully.")
+	s.app.infoBox("Saved", "Baptism certificate saved successfully.")
 }
 
 func (s *baptismSection) selectedID() (int64, bool) {

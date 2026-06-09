@@ -44,11 +44,16 @@ func newMarriageSection(app *App) *marriageSection {
 	return &marriageSection{app: app, model: &stringTableModel{}}
 }
 
-func (s *marriageSection) Page() TabPage {
-	return TabPage{
-		Title:  "Marriage",
-		Layout: VBox{},
+// Widget renders the Marriage section into a Composite whose visibility the
+// sidebar toggles.
+func (s *marriageSection) Widget(assignTo **walk.Composite) Composite {
+	return Composite{
+		AssignTo:      assignTo,
+		Visible:       false,
+		StretchFactor: 1,
+		Layout:        VBox{Spacing: 8},
 		Children: []Widget{
+			sectionTitle("Marriage Return"),
 			TabWidget{
 				Pages: []TabPage{
 					s.entryPage(),
@@ -155,6 +160,7 @@ func (s *marriageSection) historyPage() TabPage {
 			TableView{
 				AssignTo:         &s.tv,
 				AlternatingRowBG: true,
+				Font:             tableFont,
 				Model:            s.model,
 				OnItemActivated:  s.onView,
 				Columns: []TableViewColumn{

@@ -33,11 +33,16 @@ func newSettingsSection(app *App) *settingsSection {
 	return &settingsSection{app: app}
 }
 
-func (s *settingsSection) Page() TabPage {
-	return TabPage{
-		Title:  "Settings",
-		Layout: VBox{},
+// Widget renders the Settings section into a Composite whose visibility the
+// sidebar toggles.
+func (s *settingsSection) Widget(assignTo **walk.Composite) Composite {
+	return Composite{
+		AssignTo:      assignTo,
+		Visible:       false,
+		StretchFactor: 1,
+		Layout:        VBox{Spacing: 8},
 		Children: []Widget{
+			sectionTitle("Settings"),
 			GroupBox{
 				Title:  "Data location",
 				Layout: Grid{Columns: 3, Spacing: 8},
