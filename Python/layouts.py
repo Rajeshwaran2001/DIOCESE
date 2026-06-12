@@ -17,13 +17,22 @@ How to read this file
   ==> To shift the WHOLE form, use the calibration offset in Settings instead.
 
 Page sizes (portrait), width x height in mm:
-    A4     = 210 x 297
-    Letter = 216 x 279
+    A4             = 210   x 297
+    Letter         = 216   x 279
+    Death sheet    = 188   x 245   (measured: 18.8 x 24.5 cm)
+    Marriage sheet = 207   x 275   (measured: 20.7 x 27.5 cm)
+    Baptism sheet  = 207   x 279   (measured: 20.7 x 27.9 cm)
+
+The three "... sheet" entries are the real pre-printed forms (they are NOT A4).
+Each form picks its own size in Settings -> Print calibration.
 """
 
 PAGE_SIZES_MM = {
     "A4": (210.0, 297.0),
     "Letter": (215.9, 279.4),
+    "Death sheet": (188.0, 245.0),
+    "Marriage sheet": (207.0, 275.0),
+    "Baptism sheet": (207.0, 279.0),
 }
 
 # Default font used for the printed values (overridable in config).

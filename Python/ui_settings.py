@@ -15,6 +15,7 @@ from tkinter import filedialog
 
 import customtkinter as ctk
 
+import layouts
 import printing
 from ui_common import (
     Card, show_success, show_error, show_info, confirm,
@@ -101,17 +102,6 @@ class SettingsSection(ctk.CTkFrame):
         self.theme_switch.set(self.cfg.theme)
         self.theme_switch.pack(side="left")
 
-        # Paper size
-        prow = ctk.CTkFrame(body, fg_color="transparent")
-        prow.pack(fill="x", pady=6)
-        ctk.CTkLabel(prow, text="Paper size", font=LABEL_FONT, width=140,
-                     anchor="w").pack(side="left")
-        self.paper_menu = ctk.CTkOptionMenu(
-            prow, values=["A4", "Letter"], font=BUTTON_FONT,
-            command=self._set_paper)
-        self.paper_menu.set(self.cfg.paper_size)
-        self.paper_menu.pack(side="left")
-
         # Accent colour
         arow = ctk.CTkFrame(body, fg_color="transparent")
         arow.pack(fill="x", pady=6)
@@ -126,9 +116,6 @@ class SettingsSection(ctk.CTkFrame):
 
     def _set_theme(self, value):
         self.app.set_theme(value)
-
-    def _set_paper(self, value):
-        self.cfg.paper_size = value
 
     def _set_accent(self, value):
         self.cfg.accent_color = value
@@ -180,13 +167,31 @@ class SettingsSection(ctk.CTkFrame):
             font=SMALL_FONT, text_color="gray", anchor="w", justify="left",
             wraplength=560).pack(fill="x", pady=(0, 8))
 
+        paper_choices = list(layouts.PAGE_SIZES_MM.keys())
+
         for form_key, form_title in _FORMS:
             x_mm, y_mm = self.cfg.calibration(form_key)
-            row = ctk.CTkFrame(body, corner_radius=CORNER)
-            row.pack(fill="x", pady=6)
-            ctk.CTkLabel(row, text=form_title, font=HEADING_FONT, width=180,
-                         anchor="w").pack(side="left", padx=PAD, pady=PAD)
+            block = ctk.CTkFrame(body, corner_radius=CORNER)
+            block.pack(fill="x", pady=6)
+            ctk.CTkLabel(block, text=form_title, font=HEADING_FONT,
+                         anchor="w").pack(fill="x", padx=PAD, pady=(PAD, 0))
 
+            # Paper size for this form.
+            paper_row = ctk.CTkFrame(block, fg_color="transparent")
+            paper_row.pack(fill="x", padx=PAD, pady=(6, 0))
+            ctk.CTkLabel(paper_row, text="Paper size", font=LABEL_FONT,
+                         width=90, anchor="w").pack(side="left")
+            paper_menu = ctk.CTkOptionMenu(
+                paper_row, values=paper_choices, font=BUTTON_FONT, width=200,
+                command=lambda v, f=form_key: self._set_paper(f, v))
+            paper_menu.set(self.cfg.paper_size(form_key))
+            paper_menu.pack(side="left")
+
+            # Calibration offset for this form.
+            row = ctk.CTkFrame(block, fg_color="transparent")
+            row.pack(fill="x", padx=PAD, pady=(6, PAD))
+            ctk.CTkLabel(row, text="Offset", font=LABEL_FONT, width=90,
+                         anchor="w").pack(side="left")
             ctk.CTkLabel(row, text="X", font=LABEL_FONT).pack(side="left", padx=(8, 2))
             x_entry = ctk.CTkEntry(row, width=70, font=LABEL_FONT, corner_radius=CORNER)
             x_entry.insert(0, str(x_mm))
@@ -203,7 +208,10 @@ class SettingsSection(ctk.CTkFrame):
             secondary_button(row, "Alignment Test",
                              command=lambda f=form_key: self._alignment_test(f),
                              font=SMALL_FONT, width=130, height=34
-                             ).pack(side="left", padx=4, pady=PAD)
+                             ).pack(side="left", padx=4)
+
+    def _set_paper(self, form_key, value):
+        self.cfg.set_paper_size(form_key, value)
 
     def _save_cal(self, form_key):
         x_entry, y_entry = self.cal_entries[form_key]

@@ -25,12 +25,18 @@ try:  # pywin32 is only present on Windows
     import win32print
     import win32ui
     import win32con
+    import win32gui
     PRINTING_AVAILABLE = True
 except Exception:  # ImportError on non-Windows, or missing pywin32
     win32print = None
     win32ui = None
     win32con = None
+    win32gui = None
     PRINTING_AVAILABLE = False
+
+# DEVMODE constant for a user-defined (custom) paper size. Not always exposed
+# by win32con, so we keep a literal fallback.
+DMPAPER_USER = 256
 
 
 MM_PER_INCH = 25.4
@@ -136,6 +142,34 @@ def _mm_to_px(mm, dpi):
     return int(round(mm / MM_PER_INCH * dpi))
 
 
+def _make_printer_dc(printer_name, hprinter, page_mm):
+    """Create a printer DC, asking the driver for the exact ``page_mm`` size.
+
+    ``page_mm`` is (width_mm, height_mm). We set a custom (user-defined) paper
+    size on the printer's DEVMODE so the driver feeds/treats the right sheet and
+    never scales the output. If anything about the DEVMODE path fails we fall
+    back to a plain printer DC (whatever paper the driver currently has).
+    """
+    try:
+        devmode = win32print.GetPrinter(hprinter, 2)["pDevMode"]
+        if devmode is not None and page_mm:
+            w_mm, h_mm = page_mm
+            devmode.PaperSize = DMPAPER_USER
+            devmode.PaperWidth = int(round(w_mm * 10))   # tenths of a mm
+            devmode.PaperLength = int(round(h_mm * 10))  # tenths of a mm
+            fields = getattr(win32con, "DM_PAPERSIZE", 0x2)
+            fields |= getattr(win32con, "DM_PAPERLENGTH", 0x4)
+            fields |= getattr(win32con, "DM_PAPERWIDTH", 0x8)
+            devmode.Fields = devmode.Fields | fields
+            hdc = win32gui.CreateDC("WINSPOOL", printer_name, devmode)
+            return win32ui.CreateDCFromHandle(hdc)
+    except Exception:
+        pass  # fall through to the default DC
+    dc = win32ui.CreateDC()
+    dc.CreatePrinterDC(printer_name)
+    return dc
+
+
 def print_record(form_type, data, config, alignment_test=False):
     """
     Print a single record (or an alignment test) onto the selected printer.
@@ -160,6 +194,9 @@ def print_record(form_type, data, config, alignment_test=False):
         items = collect_items(form_type, data)
     cal_x, cal_y = config.calibration(form_type)
 
+    # The pre-printed sheet for this form (custom size, usually not A4).
+    page_mm = layouts.PAGE_SIZES_MM.get(config.paper_size(form_type))
+
     # Create the device context for the printer.
     try:
         hprinter = win32print.OpenPrinter(printer_name)
@@ -168,11 +205,17 @@ def print_record(form_type, data, config, alignment_test=False):
 
     dc = None
     try:
-        dc = win32ui.CreateDC()
-        dc.CreatePrinterDC(printer_name)
+        dc = _make_printer_dc(printer_name, hprinter, page_mm)
 
         dpi_x = dc.GetDeviceCaps(win32con.LOGPIXELSX)
         dpi_y = dc.GetDeviceCaps(win32con.LOGPIXELSY)
+
+        # The printable area starts a few mm inside the physical page edge.
+        # Our coordinates are measured from the PHYSICAL top-left corner, so we
+        # subtract this hardware margin to land where we expect. (Without this,
+        # the margin was silently absorbed by the calibration offset.)
+        phys_off_x = dc.GetDeviceCaps(win32con.PHYSICALOFFSETX)
+        phys_off_y = dc.GetDeviceCaps(win32con.PHYSICALOFFSETY)
 
         # Build a clean font sized to the printer DPI.
         # Font height in device units = points / 72 * dpi.
@@ -194,8 +237,8 @@ def print_record(form_type, data, config, alignment_test=False):
         dc.SetBkMode(win32con.TRANSPARENT)
 
         for x_mm, y_mm, text in items:
-            px = _mm_to_px(x_mm + cal_x, dpi_x)
-            py = _mm_to_px(y_mm + cal_y, dpi_y)
+            px = _mm_to_px(x_mm + cal_x, dpi_x) - phys_off_x
+            py = _mm_to_px(y_mm + cal_y, dpi_y) - phys_off_y
             dc.TextOut(px, py, text)
 
         dc.EndPage()

@@ -50,7 +50,13 @@ DEFAULT_DATA_PATH = CONFIG_DIR
 DEFAULTS = {
     "schema_version": 1,
     "data_path": DEFAULT_DATA_PATH,
-    "paper_size": "A4",            # "A4" or "Letter"
+    # Per-form paper size (key from layouts.PAGE_SIZES_MM). The pre-printed
+    # sheets are different sizes, so each form carries its own.
+    "paper_size": {
+        "death":    "Death sheet",
+        "marriage": "Marriage sheet",
+        "baptism":  "Baptism sheet",
+    },
     "theme": "light",             # "light" or "dark"
     "accent_color": "blue",       # CustomTkinter built-in theme name
     "printer_name": "",           # empty => use the system default printer
@@ -82,7 +88,16 @@ class Config:
         except (FileNotFoundError, ValueError):
             # Missing or corrupt -> keep defaults and write a fresh file.
             self.save()
+        self._migrate_paper_size()
         return self
+
+    def _migrate_paper_size(self):
+        """Old configs stored one global paper_size string; spread it per-form."""
+        ps = self._data.get("paper_size")
+        if isinstance(ps, str):
+            self._data["paper_size"] = {
+                "death": ps, "marriage": ps, "baptism": ps,
+            }
 
     def save(self):
         """Write the current config back to disk (atomic-ish)."""
@@ -129,13 +144,19 @@ class Config:
         """Full path to the SQLite database file."""
         return os.path.join(self.data_path, "diocese.db")
 
-    @property
-    def paper_size(self):
-        return self._data.get("paper_size", "A4")
+    def paper_size(self, form):
+        """Return the paper-size key (e.g. 'Death sheet') for a form."""
+        ps = self._data.get("paper_size", {})
+        if isinstance(ps, str):  # not yet migrated
+            return ps
+        return ps.get(form, "A4")
 
-    @paper_size.setter
-    def paper_size(self, value):
-        self._data["paper_size"] = value
+    def set_paper_size(self, form, value):
+        ps = self._data.get("paper_size")
+        if not isinstance(ps, dict):
+            ps = {}
+        ps[form] = value
+        self._data["paper_size"] = ps
         self.save()
 
     @property

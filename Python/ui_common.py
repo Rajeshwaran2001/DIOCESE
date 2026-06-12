@@ -678,8 +678,9 @@ class PreviewWindow(ctk.CTkToplevel):
         self.geometry("620x820")
         self.config_obj = config
 
+        paper_size = config.paper_size(form_type)
         page_w_mm, page_h_mm = layouts.PAGE_SIZES_MM.get(
-            config.paper_size, layouts.PAGE_SIZES_MM["A4"]
+            paper_size, layouts.PAGE_SIZES_MM["A4"]
         )
         scale = 2.6  # screen pixels per mm
         cal_x, cal_y = config.calibration(form_type)
@@ -688,7 +689,7 @@ class PreviewWindow(ctk.CTkToplevel):
             self,
             text="Preview only – the grey form is the pre-printed {} sheet; "
                  "your entries are shown in black where they will land.".format(
-                     config.paper_size),
+                     paper_size),
             font=SMALL_FONT, wraplength=580,
         ).pack(padx=12, pady=(12, 6))
 
