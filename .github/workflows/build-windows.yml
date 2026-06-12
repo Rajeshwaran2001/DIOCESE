@@ -55,7 +55,7 @@ jobs:
             --standalone `
             --assume-yes-for-downloads `
             --enable-plugin=tk-inter `
-            --windows-console-mode=disable `
+            --windows-disable-console `
             --windows-icon-from-ico=assets\app.ico `
             --include-package-data=customtkinter `
             --include-data-dir=assets=assets `
