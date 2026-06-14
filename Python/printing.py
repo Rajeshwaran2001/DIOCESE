@@ -92,14 +92,25 @@ def collect_items(form_type, data):
     layout = form["layout"]
     items = []
 
+    def add_item(fld, cx, cy, val):
+        if not val:
+            items.append((cx, cy, "—"))
+            return
+        if fld == "witness_day":
+            import re
+            m = re.match(r"^(\d+)(ST|ND|RD|TH)$", val, re.IGNORECASE)
+            if m:
+                prefix, suffix = m.groups()
+                items.append((cx, cy, prefix))
+                items.append((cx + len(prefix) * 2.2, cy, suffix.upper(), True))
+                return
+        items.append((cx, cy, val))
+
     # Shared / single-value fields.
     for field, (x_mm, y_mm) in layout.items():
         value = data.get(field, "")
-        if value is None:
-            value = ""
-        value = str(value).strip()
-        if value:
-            items.append((x_mm, y_mm, value))
+        value = "" if value is None else str(value).strip()
+        add_item(field, x_mm, y_mm, value)
 
     # Marriage: two party columns.
     if form_type == "marriage":
@@ -111,8 +122,7 @@ def collect_items(form_type, data):
             for field, y_mm in party_layout.items():
                 value = party.get(field, "")
                 value = "" if value is None else str(value).strip()
-                if value:
-                    items.append((x_mm, y_mm, value))
+                add_item(field, x_mm, y_mm, value)
 
     return items
 
@@ -170,7 +180,7 @@ def _make_printer_dc(printer_name, hprinter, page_mm):
     return dc
 
 
-def print_record(form_type, data, config, alignment_test=False):
+def print_record(form_type, data, config, alignment_test=False, copies=1):
     """
     Print a single record (or an alignment test) onto the selected printer.
 
@@ -228,20 +238,40 @@ def print_record(form_type, data, config, alignment_test=False):
                 "weight": 400,  # normal
             }
         )
+        sup_font_height = int(round((font_pt * 0.6) / 72.0 * dpi_y))
+        sup_font = win32ui.CreateFont(
+            {
+                "name": config.font_name,
+                "height": sup_font_height,
+                "weight": 400,
+            }
+        )
 
         dc.StartDoc("Diocese Certificate - {}".format(form_type))
-        dc.StartPage()
-        dc.SelectObject(font)
-        # Black text, transparent background so we don't blank out pre-printed lines.
-        dc.SetTextColor(0x000000)
-        dc.SetBkMode(win32con.TRANSPARENT)
+        
+        for _ in range(copies):
+            dc.StartPage()
+            # Black text, transparent background so we don't blank out pre-printed lines.
+            dc.SetTextColor(0x000000)
+            dc.SetBkMode(win32con.TRANSPARENT)
 
-        for x_mm, y_mm, text in items:
-            px = _mm_to_px(x_mm + cal_x, dpi_x) - phys_off_x
-            py = _mm_to_px(y_mm + cal_y, dpi_y) - phys_off_y
-            dc.TextOut(px, py, text)
+            for item in items:
+                x_mm, y_mm, text = item[0], item[1], item[2]
+                is_sup = item[3] if len(item) > 3 else False
 
-        dc.EndPage()
+                px = _mm_to_px(x_mm + cal_x, dpi_x) - phys_off_x
+                py = _mm_to_px(y_mm + cal_y, dpi_y) - phys_off_y
+
+                if is_sup:
+                    dc.SelectObject(sup_font)
+                    py -= int(round(font_pt * 0.4 / 72.0 * dpi_y))
+                else:
+                    dc.SelectObject(font)
+
+                dc.TextOut(px, py, text)
+
+            dc.EndPage()
+            
         dc.EndDoc()
     except PrinterError:
         raise

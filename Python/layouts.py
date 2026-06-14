@@ -37,7 +37,7 @@ PAGE_SIZES_MM = {
 
 # Default font used for the printed values (overridable in config).
 DEFAULT_FONT = "Arial"
-DEFAULT_FONT_PT = 11
+DEFAULT_FONT_PT = 10
 
 
 # =========================================================================== #
@@ -53,24 +53,22 @@ DEFAULT_FONT_PT = 11
 DEATH_LAYOUT = {
     # field name           : (x_mm, y_mm)
     # Note: "S.No." is pre-printed on the sheet, so it is NOT printed by us.
-    "number":                (90.0,  52.0),
-    "date_of_death":         (90.0,  62.0),
-    "date_of_burial":        (90.0,  71.0),
-    "name_of_dead_person":   (90.0,  81.0),
-    "age":                   (90.0,  90.0),
-    "occupation":            (90.0,  99.0),
-    "cause_of_death":        (90.0,  109.0),
-    "family_relation":       (90.0,  118.0),
-    "place_of_death":        (90.0,  128.0),
-    "person_who_buried_body":(90.0,  137.0),
-    "place_of_burial":       (90.0,  147.0),
+    "number":                (79.0,  38.0),
+    "date_of_death":         (79.0,  48.0),
+    "date_of_burial":        (79.0,  56.0),
+    "name_of_dead_person":   (79.0,  64.0),
+    "age":                   (79.0,  72.0),
+    "occupation":            (79.0,  80.0),
+    "cause_of_death":        (79.0,  89.0),
+    "family_relation":       (79.0,  97.0),
+    "place_of_death":        (79.0,  105.0),
+    "person_who_buried_body":(79.0,  113.0),
+    "place_of_burial":       (79.0,  121.0),
     # Certifying paragraph blanks:
-    "registrar_name":        (40.0,  175.0),  # "I, ____ Diocesan Registrar"
-    "pastorate_name":        (103.0, 195.0),  # "...burial of ____ pastorate"
-    "witness_date":          (95.0,  230.0),  # "Witness my hand ... day of ____"
-    # Footer:
-    "prepared_by":           (37.0,  256.0),
-    "checked_by":            (37.0,  282.0),
+    "registrar_name":        (26.0,  145.0),
+    "pastorate_name":        (87.0,  158.0),
+    "witness_day":           (56.0,  192.0),
+    "witness_month_year":    (92.0,  192.0),
 }
 
 
@@ -83,8 +81,8 @@ DEATH_LAYOUT = {
 # in two columns: Party A and Party B. Shared fields use the single value X.
 # =========================================================================== #
 # X positions:
-_M_VALUE_X = 95.0     # X for shared single-value fields
-_M_PARTY_A_X = 95.0   # X for Party A column
+_M_VALUE_X = 91.0     # X for shared single-value fields
+_M_PARTY_A_X = 91.0   # X for Party A column
 _M_PARTY_B_X = 150.0  # X for Party B column
 
 MARRIAGE_LAYOUT = {
@@ -96,10 +94,9 @@ MARRIAGE_LAYOUT = {
     "witnesses":            (_M_VALUE_X, 167.0),
     "place_solemnized":     (_M_VALUE_X, 178.0),
     # certifying paragraph + footer
-    "registrar_name":       (40.0, 200.0),
-    "witness_date":         (95.0, 222.0),
-    "prepared_by":          (37.0, 246.0),
-    "checked_by":           (37.0, 258.0),
+    "registrar_name":       (140.0, 260.0),
+    "witness_day":          (48.0, 220.5),
+    "witness_month_year":   (98.0, 220.5),
 }
 
 # Per-party fields: each maps to a y_mm; the engine uses PARTY_A_X / PARTY_B_X.
@@ -124,7 +121,7 @@ MARRIAGE_PARTY_X = {"A": _M_PARTY_A_X, "B": _M_PARTY_B_X}
 #
 # Single label column; values start at ~x=85mm after each colon.
 # =========================================================================== #
-_B_VALUE_X = 85.0
+_B_VALUE_X = 81.0
 
 BAPTISM_LAYOUT = {
     "number":                    (_B_VALUE_X, 50.0),
@@ -140,10 +137,9 @@ BAPTISM_LAYOUT = {
     "where_baptized":            (_B_VALUE_X, 150.0),
     "signature_by_whom_baptized":(_B_VALUE_X, 162.0),
     # certifying paragraph + footer
-    "baptized_by_name":          (45.0, 185.0),   # "Mr / Rev. ____"
-    "witness_date":              (75.0, 215.0),   # "Witness my hand the ... day of ____"
-    "prepared_by":               (37.0, 248.0),
-    "checked_by":                (37.0, 262.0),
+    "baptized_by_name":          (32.0, 183.5),   # "Mr / Rev. ____"
+    "witness_day":               (48.0, 213.5),
+    "witness_month_year":        (98.0, 213.5),
 }
 
 
@@ -171,29 +167,28 @@ DEATH_TEMPLATE = {
         (105.0, 25.0, "DEATH EXTRACT"),
     ],
     "labels": [
-        (12.0,  52.0, "NUMBER"),
-        (12.0,  62.0, "DATE OF DEATH"),
-        (12.0,  71.0, "DATE OF BURIAL"),
-        (12.0,  81.0, "NAME OF DEAD PERSON"),
-        (12.0,  90.0, "AGE"),
-        (12.0,  99.0, "OCCUPATION"),
-        (12.0,  109.0, "CAUSE OF DEATH"),
-        (12.0,  118.0, "FAMILY RELATION"),
-        (12.0,  128.0, "PLACE OF DEATH"),
-        (12.0,  137.0, "PERSON WHO BURIED THE BODY"),
-        (12.0,  147.0, "PLACE OF BURIAL"),
-        (160.0, 47.0, "S.No."),
-        (12.0,  170.0, "I, ............................... Diocesan Registrar,"),
-        (12.0,  176.0, "Diocese of Madurai Ramnad, certify that this is"),
-        (12.0,  182.0, "the true extract of the Register of death and"),
-        (12.0,  188.0, "burial of ........................ pastorate."),
-        (12.0,  225.0, "Witness my hand .......... day of .................."),
-        (12.0,  256.0, "Prepared by :"),
-        (12.0,  282.0, "Checked by :"),
-        (150.0, 282.0, "DIOCESAN REGISTRAR"),
+        (12.0,  38.0, "NUMBER"),
+        (12.0,  48.0, "DATE OF DEATH"),
+        (12.0,  56.0, "DATE OF BURIAL"),
+        (12.0,  64.0, "NAME OF DEAD PERSON"),
+        (12.0,  72.0, "AGE"),
+        (12.0,  80.0, "OCCUPATION"),
+        (12.0,  89.0, "CAUSE OF DEATH"),
+        (12.0,  97.0, "FAMILY RELATION"),
+        (12.0,  105.0, "PLACE OF DEATH"),
+        (12.0,  113.0, "PERSON WHO BURIED THE BODY"),
+        (12.0,  121.0, "PLACE OF BURIAL"),
+        (160.0, 33.0, "S.No."),
+        (12.0,  148.5, "I, ................................................................ Diocesan Registrar, Diocese of"),
+        (12.0,  154.5, "Madurai Ramnad, 162, East Veli St., Madurai-625 001. certify that this is the true extract of"),
+        (12.0,  161.5, "the Register of death and burial of ................................................................"),
+        (12.0,  167.5, "pastorate which is kept in this office of the Diocesan Registrar, Diocese of Madurai Ramnad,"),
+        (12.0,  173.5, "162, East Veli St., Madurai-625 001."),
+        (12.0,  195.5, "Witness my hand........................day of........................................"),
+        (150.0, 252.0, "DIOCESAN REGISTRAR"),
     ],
-    "colon_x": 80.0,   # where the ":" sits between label and value rows
-    "colon_rows": [52.0, 62.0, 71.0, 81.0, 90.0, 99.0, 109.0, 118.0, 128.0, 137.0, 147.0],
+    "colon_x": 75.0,   # where the ":" sits between label and value rows
+    "colon_rows": [38.0, 48.0, 56.0, 64.0, 72.0, 80.0, 89.0, 97.0, 105.0, 113.0, 121.0],
 }
 
 MARRIAGE_TEMPLATE = {
@@ -220,9 +215,7 @@ MARRIAGE_TEMPLATE = {
         (12.0,  195.0, "Diocesan Registrar, Diocese of Madura and"),
         (12.0,  201.0, "Ramnad, certifies that this is true record in"),
         (12.0,  207.0, "the Register of Copy of Marriage Returns."),
-        (12.0,  222.0, "Witness my hand .......... day of ..............."),
-        (12.0,  246.0, "Prepared by :"),
-        (12.0,  258.0, "Checked by :"),
+        (12.0,  222.0, "Witness my hand........................day of........................................"),
         (150.0, 270.0, "Diocesan Registrar"),
     ],
     "colon_x": 88.0,
@@ -248,9 +241,7 @@ BAPTISM_TEMPLATE = {
         (12.0,  150.0, "WHERE BAPTIZED"),
         (12.0,  162.0, "SIGNATURE BY WHOM BAPTIZED"),
         (12.0,  185.0, "Mr / Rev. ......................"),
-        (12.0,  215.0, "Witness my hand the .......... day of ........"),
-        (12.0,  248.0, "Prepared by :"),
-        (12.0,  262.0, "Checked by :"),
+        (12.0,  215.0, "Witness my hand the ........................day of........................................"),
     ],
     "colon_x": 78.0,
     "colon_rows": [50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 162.0],

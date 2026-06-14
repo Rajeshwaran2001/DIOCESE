@@ -42,9 +42,8 @@ _SHEET_FIELDS = [
 # Closing certificate paragraph + footer.
 _FOOTER = [
     ("baptized_by_name", "Mr / Rev. (baptized by)", False),
-    ("witness_date", "Witness Date (day of ___ two thousand and ___)", False),
-    ("prepared_by", "Prepared By", False),
-    ("checked_by", "Checked By", False),
+    ("witness_day", "Witness Date - Day", False),
+    ("witness_month_year", "Witness Date - Month & Year", False),
 ]
 
 _REQUIRED = [("number", "Number"), ("christian_name", "Christian Name")]
@@ -70,6 +69,7 @@ class BaptismSection(ctk.CTkFrame):
         # The entry form is large (~1s to build), so it is created lazily on the
         # first Add/Edit. Opening the section to view the list stays instant.
         self.entry_view = None
+        self.current_view_name = "List"
 
         self._build_list_view()
         self._show("List")
@@ -97,7 +97,7 @@ class BaptismSection(ctk.CTkFrame):
         self.entry_view = ctk.CTkScrollableFrame(self, fg_color="transparent")
         head = ctk.CTkFrame(self.entry_view, fg_color="transparent")
         head.pack(fill="x", padx=PAD, pady=(PAD, 0))
-        secondary_button(head, "←  Back to list", command=lambda: self._show("List"),
+        secondary_button(head, "←  Back to list", command=self._cancel_entry,
                          font=SMALL_FONT, width=140, height=36).pack(side="left")
         self.entry_title = ctk.CTkLabel(head, text="New Baptism Certificate", font=TITLE_FONT)
         self.entry_title.pack(side="left", padx=(12, 0))
@@ -142,10 +142,22 @@ class BaptismSection(ctk.CTkFrame):
                        ).pack(side="left", padx=8)
         secondary_button(actions, "Preview", command=self._preview
                          ).pack(side="left", padx=8)
-        secondary_button(actions, "Clear", command=self._clear
+        secondary_button(actions, "Cancel", command=self._cancel_entry
                          ).pack(side="left", padx=8)
 
+    def _cancel_entry(self):
+        if confirm(self, "Cancel", "Discard any unsaved changes and return to the list?"):
+            self._clear()
+            self._show("List")
+
+    def can_navigate_away(self):
+        if self.current_view_name == "Entry":
+            show_warning(self, "Unsaved changes", "Please Save or Cancel before leaving this screen.")
+            return False
+        return True
+
     def _show(self, which):
+        self.current_view_name = which
         if self.entry_view is not None:
             self.entry_view.pack_forget()
         self.list_view.pack_forget()
@@ -196,8 +208,12 @@ class BaptismSection(ctk.CTkFrame):
         PreviewWindow(self, self.form_type, self._collect(), self.app.config)
 
     def _print(self, record):
+        from ui_common import ask_copies
+        copies = ask_copies(self)
+        if copies <= 0:
+            return
         try:
-            printing.print_record(self.form_type, record, self.app.config)
+            printing.print_record(self.form_type, record, self.app.config, copies=copies)
         except printing.PrinterError as exc:
             show_error(self, "Printing problem", str(exc))
 

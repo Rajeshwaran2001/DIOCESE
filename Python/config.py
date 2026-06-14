@@ -63,8 +63,8 @@ DEFAULTS = {
     "theme": "light",             # "light" or "dark"
     "accent_color": "blue",       # CustomTkinter built-in theme name
     "printer_name": "",           # empty => use the system default printer
-    "font_name": "Arial",
-    "font_size_pt": 11,
+    "font_name": "Courier",
+    "font_size_pt": 12,
     # App-open password. Stored as a PBKDF2-SHA256 hash + salt (never plaintext).
     # Empty hash => no password set => the app opens without a prompt.
     "password_hash": "",
@@ -99,7 +99,15 @@ class Config:
             # Missing or corrupt -> keep defaults and write a fresh file.
             self.save()
         self._migrate_paper_size()
+        self._migrate_font()
         return self
+
+    def _migrate_font(self):
+        """Old configs defaulted to Arial 11. Upgrade them to Courier 12 if unchanged."""
+        if self._data.get("font_name") == "Arial" and self._data.get("font_size_pt") == 11:
+            self._data["font_name"] = "Courier"
+            self._data["font_size_pt"] = 12
+            self.save()
 
     def _migrate_paper_size(self):
         """Old configs stored one global paper_size string; spread it per-form."""
@@ -198,11 +206,21 @@ class Config:
 
     @property
     def font_name(self):
-        return self._data.get("font_name", "Arial")
+        return self._data.get("font_name", "Courier")
+
+    @font_name.setter
+    def font_name(self, value):
+        self._data["font_name"] = value
+        self.save()
 
     @property
     def font_size_pt(self):
-        return int(self._data.get("font_size_pt", 11))
+        return int(self._data.get("font_size_pt", 12))
+
+    @font_size_pt.setter
+    def font_size_pt(self, value):
+        self._data["font_size_pt"] = int(value)
+        self.save()
 
     # -- calibration ------------------------------------------------------- #
     def calibration(self, form):

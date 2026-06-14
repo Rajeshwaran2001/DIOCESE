@@ -31,14 +31,14 @@ DEATH_FIELDS = [
     "serial_no", "number", "date_of_death", "date_of_burial",
     "name_of_dead_person", "age", "occupation", "cause_of_death",
     "family_relation", "place_of_death", "person_who_buried_body",
-    "place_of_burial", "registrar_name", "pastorate_name", "witness_date",
-    "prepared_by", "checked_by",
+    "place_of_burial", "registrar_name", "pastorate_name",
+    "witness_day", "witness_month_year",
 ]
 
 MARRIAGE_FIELDS = [
     "serial_no", "number", "when_married", "place_solemnized", "witnesses",
-    "signature_of_licensee", "witness_date", "prepared_by", "checked_by",
-    "registrar_name",
+    "signature_of_licensee", "registrar_name",
+    "witness_day", "witness_month_year",
 ]
 
 MARRIAGE_PARTY_FIELDS = [
@@ -51,8 +51,8 @@ BAPTISM_FIELDS = [
     "number", "when_baptized", "said_to_be_born", "christian_name",
     "surname_former_name", "sex", "father_name", "mother_name",
     "trade_or_profession", "names_of_godparents", "where_baptized",
-    "signature_by_whom_baptized", "baptized_by_name", "witness_date",
-    "prepared_by", "checked_by",
+    "signature_by_whom_baptized", "baptized_by_name",
+    "witness_day", "witness_month_year",
 ]
 
 
@@ -152,6 +152,26 @@ class Database:
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
             ("schema_version", str(SCHEMA_VERSION)),
         )
+
+        # Defensive migrations for users with older schemas
+        try:
+            cur.execute("ALTER TABLE death_extract ADD COLUMN witness_day TEXT")
+            cur.execute("ALTER TABLE death_extract ADD COLUMN witness_month_year TEXT")
+        except sqlite3.OperationalError:
+            pass
+            
+        try:
+            cur.execute("ALTER TABLE marriage_return ADD COLUMN witness_day TEXT")
+            cur.execute("ALTER TABLE marriage_return ADD COLUMN witness_month_year TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            cur.execute("ALTER TABLE baptism ADD COLUMN witness_day TEXT")
+            cur.execute("ALTER TABLE baptism ADD COLUMN witness_month_year TEXT")
+        except sqlite3.OperationalError:
+            pass
+
         self.conn.commit()
 
     def close(self):

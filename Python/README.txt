@@ -1,0 +1,20 @@
+for death extract i have exact mm where it need start from left to right and top to bottom for each field exactly remeber all 3 sheet's are pre printened and custom sizes each
+
+left to right 78 mm for death extract from top to bottom
+
+1. 38 mm for number,
+    2. 48 mm for date of death
+3. 56 mm for date of burial
+4. 64 mm for name of dead person
+5. 72 mm for age
+6. 80 mm for occupation
+7. 89 mm for cause of death
+8. 97 mm for family relatio
+9. 105 mm for place of death 
+10. 113 mm for person who buried the body
+11. 121 mm for place of burial
+
+for diosen regieister i need to be  25 mm for left to right 147 mm from top to bottom, 86 mm from left to right, 160 mm from top to bottom for burial of
+
+    55 mm from left to right and 194 mm from top to bottom for witness date
+91 mm from left to right and 194 mm from top to bottom for witness month and year

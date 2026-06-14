@@ -612,6 +612,10 @@ class App(ctk.CTk):
     # Navigation
     # ------------------------------------------------------------------ #
     def show_section(self, name):
+        if self.current is not None and hasattr(self.current, "can_navigate_away"):
+            if not self.current.can_navigate_away():
+                return
+
         section = self._get_section(name)
         if section is self.current:
             return

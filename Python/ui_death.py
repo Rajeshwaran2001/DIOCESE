@@ -42,10 +42,8 @@ _SHEET_FIELDS = [
 # Closing certificate paragraph + footer.
 _FOOTER = [
     ("registrar_name", "Diocesan Registrar Name", False),
-    ("pastorate_name", "Pastorate Name", False),
-    ("witness_date", "Witness Date (day of ___)", False),
-    ("prepared_by", "Prepared By", False),
-    ("checked_by", "Checked By", False),
+    ("witness_day", "Witness Date - Day", False),
+    ("witness_month_year", "Witness Date - Month & Year", False),
 ]
 
 _REQUIRED = [("number", "Number"), ("name_of_dead_person", "Name of Dead Person")]
@@ -72,6 +70,7 @@ class DeathSection(ctk.CTkFrame):
         # The entry form is large (~1s to build), so it is created lazily on the
         # first Add/Edit. Opening the section to view the list stays instant.
         self.entry_view = None
+        self.current_view_name = "List"
 
         self._build_list_view()
         self._show("List")   # list/grid is the default screen
@@ -102,7 +101,7 @@ class DeathSection(ctk.CTkFrame):
         # Entry header: a back link + title, so the user can return to the list.
         head = ctk.CTkFrame(self.entry_view, fg_color="transparent")
         head.pack(fill="x", padx=PAD, pady=(PAD, 0))
-        secondary_button(head, "←  Back to list", command=lambda: self._show("List"),
+        secondary_button(head, "←  Back to list", command=self._cancel_entry,
                          font=SMALL_FONT, width=140, height=36).pack(side="left")
         self.entry_title = ctk.CTkLabel(head, text="New Death Extract", font=TITLE_FONT)
         self.entry_title.pack(side="left", padx=(12, 0))
@@ -117,15 +116,40 @@ class DeathSection(ctk.CTkFrame):
         grid.grid_columnconfigure(1, weight=1)                # value column
 
         for r, (key, label, required, is_date) in enumerate(_SHEET_FIELDS):
-            ctk.CTkLabel(grid, text=label + ("  *" if required else ""),
-                         font=(FONT_FAMILY, 13, "bold"), anchor="w",
-                         justify="left", wraplength=220).grid(
-                row=r, column=0, sticky="w", padx=(4, 12), pady=6)
-            cls = DatePicker if is_date else LabeledEntry
-            widget = cls(grid, "")          # label sits in the left cell
-            widget.label.pack_forget()
-            widget.grid(row=r, column=1, sticky="ew", pady=4)
-            self.fields[key] = widget
+            if key == "date_of_burial":
+                continue
+
+            if key == "date_of_death":
+                ctk.CTkLabel(grid, text="Date of Death / Burial",
+                             font=(FONT_FAMILY, 13, "bold"), anchor="w",
+                             justify="left", wraplength=220).grid(
+                    row=r, column=0, sticky="w", padx=(4, 12), pady=6)
+                
+                frame = ctk.CTkFrame(grid, fg_color="transparent")
+                frame.grid(row=r, column=1, sticky="ew", pady=4)
+                
+                w_dod = DatePicker(frame, "")
+                w_dod.label.pack_forget()
+                w_dod.pack(side="left", fill="x", expand=True)
+                self.fields["date_of_death"] = w_dod
+
+                ctk.CTkLabel(frame, text="Burial", font=(FONT_FAMILY, 13, "bold"),
+                             anchor="w").pack(side="left", padx=12)
+
+                w_dob = DatePicker(frame, "")
+                w_dob.label.pack_forget()
+                w_dob.pack(side="left", fill="x", expand=True)
+                self.fields["date_of_burial"] = w_dob
+            else:
+                ctk.CTkLabel(grid, text=label + ("  *" if required else ""),
+                             font=(FONT_FAMILY, 13, "bold"), anchor="w",
+                             justify="left", wraplength=220).grid(
+                    row=r, column=0, sticky="w", padx=(4, 12), pady=6)
+                cls = DatePicker if is_date else LabeledEntry
+                widget = cls(grid, "")          # label sits in the left cell
+                widget.label.pack_forget()
+                widget.grid(row=r, column=1, sticky="ew", pady=4)
+                self.fields[key] = widget
 
         # Closing certificate paragraph + footer.
         footer_card = Card(self.entry_view, title="Certificate paragraph & footer")
@@ -147,11 +171,23 @@ class DeathSection(ctk.CTkFrame):
                        ).pack(side="left", padx=8)
         secondary_button(actions, "Preview", command=self._preview
                          ).pack(side="left", padx=8)
-        secondary_button(actions, "Clear", command=self._clear
+        secondary_button(actions, "Cancel", command=self._cancel_entry
                          ).pack(side="left", padx=8)
+
+    def _cancel_entry(self):
+        if confirm(self, "Cancel", "Discard any unsaved changes and return to the list?"):
+            self._clear()
+            self._show("List")
+
+    def can_navigate_away(self):
+        if self.current_view_name == "Entry":
+            show_warning(self, "Unsaved changes", "Please Save or Cancel before leaving this screen.")
+            return False
+        return True
 
     # ------------------------------------------------------------------ #
     def _show(self, which):
+        self.current_view_name = which
         if self.entry_view is not None:
             self.entry_view.pack_forget()
         self.list_view.pack_forget()
@@ -170,7 +206,9 @@ class DeathSection(ctk.CTkFrame):
 
     # ------------------------------------------------------------------ #
     def _collect(self):
-        return {key: w.get() for key, w in self.fields.items()}
+        data = {key: w.get() for key, w in self.fields.items()}
+        data["pastorate_name"] = data.get("place_of_burial", "")
+        return data
 
     def _load(self, record):
         for key, w in self.fields.items():
@@ -210,8 +248,12 @@ class DeathSection(ctk.CTkFrame):
         PreviewWindow(self, self.form_type, self._collect(), self.app.config)
 
     def _print(self, record):
+        from ui_common import ask_copies
+        copies = ask_copies(self)
+        if copies <= 0:
+            return
         try:
-            printing.print_record(self.form_type, record, self.app.config)
+            printing.print_record(self.form_type, record, self.app.config, copies=copies)
         except printing.PrinterError as exc:
             show_error(self, "Printing problem", str(exc))
 

@@ -64,11 +64,11 @@ def secondary_button(parent, text, command=None, **kw):
 # --------------------------------------------------------------------------- #
 # Validation helpers
 # --------------------------------------------------------------------------- #
-_DATE_RE = re.compile(r"^\s*\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s*$")
+_DATE_RE = re.compile(r"^\s*\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\s*$")
 
 
 def is_valid_date(text):
-    """Accept blank, or dd/mm/yyyy / dd-mm-yyyy (clerical free-form friendly)."""
+    """Accept blank, or dd/mm/yyyy / dd-mm-yyyy / dd.mm.yyyy (clerical free-form friendly)."""
     if not text or not text.strip():
         return True  # dates are optional unless marked required
     return bool(_DATE_RE.match(text))
@@ -224,6 +224,17 @@ def choose(parent, title, message, options, cancel="Cancel"):
     return dlg.result
 
 
+def ask_copies(parent):
+    """Prompt the user for the number of print copies."""
+    res = choose(parent, "Print", "How many copies would you like to print?", ["1", "2", "3", "4"])
+    if not res:
+        return 0
+    try:
+        return int(res)
+    except Exception:
+        return 0
+
+
 class _PasswordDialog(ctk.CTkToplevel):
     """Modal password prompt.
 
@@ -355,14 +366,26 @@ class LabeledEntry(ctk.CTkFrame):
             self, font=ENTRY_FONT, corner_radius=CORNER, height=38, width=width
         )
         self.entry.pack(fill="x", pady=(3, 0))
+        self.entry.bind("<KeyRelease>", self._auto_upper)
+
+    def _auto_upper(self, event):
+        if getattr(event, "keysym", "") in ("Left", "Right", "Up", "Down", "Home", "End", "Shift_L", "Shift_R", "Tab"):
+            return
+        val = self.entry.get()
+        upper_val = val.upper()
+        if val != upper_val:
+            pos = self.entry.index("insert")
+            self.entry.delete(0, "end")
+            self.entry.insert(0, upper_val)
+            self.entry.icursor(pos)
 
     def get(self):
-        return self.entry.get()
+        return self.entry.get().upper()
 
     def set(self, value):
         self.entry.delete(0, "end")
         if value:
-            self.entry.insert(0, str(value))
+            self.entry.insert(0, str(value).upper())
 
     def clear(self):
         self.entry.delete(0, "end")
@@ -397,6 +420,8 @@ class DatePicker(ctk.CTkFrame):
             placeholder_text="dd/mm/yyyy",
         )
         self.entry.pack(side="left", fill="x", expand=True)
+        self.entry.bind("<KeyRelease>", self._auto_upper)
+
         ctk.CTkButton(
             row, text="📅", width=42, height=38, corner_radius=CORNER,
             font=BUTTON_FONT, fg_color=PRIMARY_COLOR, hover_color=PRIMARY_HOVER,
@@ -414,9 +439,20 @@ class DatePicker(ctk.CTkFrame):
 
         self._popup = None
 
+    def _auto_upper(self, event):
+        if getattr(event, "keysym", "") in ("Left", "Right", "Up", "Down", "Home", "End", "Shift_L", "Shift_R", "Tab"):
+            return
+        val = self.entry.get()
+        upper_val = val.upper()
+        if val != upper_val:
+            pos = self.entry.index("insert")
+            self.entry.delete(0, "end")
+            self.entry.insert(0, upper_val)
+            self.entry.icursor(pos)
+
     # ------------------------------------------------------------------ #
     def get(self):
-        return self.entry.get()
+        return self.entry.get().upper()
         # With a time picker enabled:
         # date, time = self.entry.get().strip(), self.time_entry.get().strip()
         # return (date + " " + time).strip() if time else date
@@ -424,7 +460,7 @@ class DatePicker(ctk.CTkFrame):
     def set(self, value):
         self.entry.delete(0, "end")
         if value:
-            self.entry.insert(0, str(value))
+            self.entry.insert(0, str(value).upper())
 
     def clear(self):
         self.entry.delete(0, "end")
@@ -434,7 +470,7 @@ class DatePicker(ctk.CTkFrame):
     def _parse_current(self):
         """Return (year, month, day) from the entry, defaulting to today."""
         import datetime
-        m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})", self.entry.get())
+        m = re.search(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})", self.entry.get())
         if m:
             d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
             if y < 100:
@@ -472,12 +508,19 @@ class _CalendarPopup(ctk.CTkToplevel):
 
         nav = ctk.CTkFrame(self, fg_color="transparent")
         nav.pack(fill="x", padx=10, pady=(10, 4))
+        
+        secondary_button(nav, "«", command=lambda: self._shift_year(-1),
+                         font=BUTTON_FONT, width=34, height=34).pack(side="left")
         secondary_button(nav, "‹", command=lambda: self._shift(-1),
-                         font=BUTTON_FONT, width=40, height=34).pack(side="left")
+                         font=BUTTON_FONT, width=34, height=34).pack(side="left", padx=(4, 0))
+        
         self.title_label = ctk.CTkLabel(nav, text="", font=HEADING_FONT)
         self.title_label.pack(side="left", expand=True)
+
         secondary_button(nav, "›", command=lambda: self._shift(1),
-                         font=BUTTON_FONT, width=40, height=34).pack(side="right")
+                         font=BUTTON_FONT, width=34, height=34).pack(side="left", padx=(0, 4))
+        secondary_button(nav, "»", command=lambda: self._shift_year(1),
+                         font=BUTTON_FONT, width=34, height=34).pack(side="left")
 
         self.grid_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.grid_frame.pack(padx=10, pady=(0, 10))
@@ -486,6 +529,10 @@ class _CalendarPopup(ctk.CTkToplevel):
         self._center(picker)
         self.transient(picker.winfo_toplevel())
         self.grab_set()
+
+    def _shift_year(self, delta):
+        self.year += delta
+        self._render()
 
     def _shift(self, delta):
         self.month += delta
@@ -680,7 +727,7 @@ class RecordTable(ctk.CTkFrame):
         """Turn dd/mm/yyyy(-ish) into yyyymmdd int for comparing; 0 if unparseable."""
         if not value:
             return 0
-        m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})", str(value))
+        m = re.search(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})", str(value))
         if not m:
             y = RecordTable._parse_year(value)
             return y * 10000 if y else 0
@@ -888,12 +935,20 @@ class PreviewWindow(ctk.CTkToplevel):
 
         # --- 2) Overlay the user's VALUES in black ----------------------- #
         items = printing.collect_items(form_type, data)
-        for x_mm, y_mm, text in items:
+        for item in items:
+            x_mm, y_mm, text = item[0], item[1], item[2]
+            is_sup = item[3] if len(item) > 3 else False
+            
             x = (x_mm + cal_x) * scale
             y = (y_mm + cal_y) * scale
+            
+            font_size = 6 if is_sup else 9
+            if is_sup:
+                y -= 1.5 * scale
+
             canvas.create_text(
                 x, y, text=text, anchor="nw", fill="#111111",
-                font=(config.font_name, 9),
+                font=(config.font_name, font_size),
             )
 
         ctk.CTkButton(
@@ -901,7 +956,19 @@ class PreviewWindow(ctk.CTkToplevel):
             command=self.destroy,
         ).pack(pady=(0, 12))
 
+        self._center()
         self.transient(parent)
+
+    def _center(self):
+        self.update_idletasks()
+        try:
+            w = 620
+            h = 820
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            self.geometry("+{}+{}".format(max((sw - w) // 2, 0), max((sh - h) // 2, 0)))
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ #
     def _draw_template(self, canvas, form_type, scale):

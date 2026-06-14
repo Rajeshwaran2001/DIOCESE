@@ -139,22 +139,67 @@ class SettingsSection(ctk.CTkFrame):
                          "The system default printer will be used when available.",
                          font=SMALL_FONT, text_color="gray", anchor="w",
                          wraplength=520, justify="left").pack(fill="x")
-            return
+        else:
+            options = ["(system default)"] + printers
+            row = ctk.CTkFrame(body, fg_color="transparent")
+            row.pack(fill="x", pady=6)
+            ctk.CTkLabel(row, text="Printer", font=LABEL_FONT, width=140, anchor="w"
+                         ).pack(side="left")
+            self.printer_menu = ctk.CTkOptionMenu(
+                row, values=options, font=BUTTON_FONT, command=self._set_printer,
+                width=320)
+            current = self.cfg.printer_name or "(system default)"
+            self.printer_menu.set(current if current in options else "(system default)")
+            self.printer_menu.pack(side="left")
 
-        options = ["(system default)"] + printers
-        row = ctk.CTkFrame(body, fg_color="transparent")
-        row.pack(fill="x", pady=6)
-        ctk.CTkLabel(row, text="Printer", font=LABEL_FONT, width=140, anchor="w"
-                     ).pack(side="left")
-        self.printer_menu = ctk.CTkOptionMenu(
-            row, values=options, font=BUTTON_FONT, command=self._set_printer,
-            width=320)
-        current = self.cfg.printer_name or "(system default)"
-        self.printer_menu.set(current if current in options else "(system default)")
-        self.printer_menu.pack(side="left")
+        # Print Font
+        import tkinter.font as tkfont
+        fonts = sorted(list(set(tkfont.families())))
+        if not fonts:
+            fonts = ["Courier", "Arial", "Times New Roman"]
+
+        frow = ctk.CTkFrame(body, fg_color="transparent")
+        frow.pack(fill="x", pady=6)
+        ctk.CTkLabel(frow, text="Print Font", font=LABEL_FONT, width=140, anchor="w").pack(side="left")
+        self.font_menu = ctk.CTkOptionMenu(
+            frow, values=fonts, font=BUTTON_FONT, width=240)
+        
+        current_font = self.cfg.font_name
+        if current_font not in fonts:
+            fonts.append(current_font)
+            fonts.sort()
+            self.font_menu.configure(values=fonts)
+        self.font_menu.set(current_font)
+        self.font_menu.pack(side="left")
+
+        # Print Font Size
+        srow = ctk.CTkFrame(body, fg_color="transparent")
+        srow.pack(fill="x", pady=6)
+        ctk.CTkLabel(srow, text="Print Font Size", font=LABEL_FONT, width=140, anchor="w").pack(side="left")
+        self.size_entry = ctk.CTkEntry(srow, font=LABEL_FONT, width=80, corner_radius=CORNER)
+        self.size_entry.insert(0, str(self.cfg.font_size_pt))
+        self.size_entry.pack(side="left")
+
+        primary_button(srow, "Apply Font", font=BUTTON_FONT, width=90, height=32,
+                       command=self._save_font).pack(side="left", padx=12)
 
     def _set_printer(self, value):
         self.cfg.printer_name = "" if value == "(system default)" else value
+
+    def _save_font(self):
+        font_name = self.font_menu.get().strip()
+        if not font_name:
+            font_name = "Courier"
+            self.font_menu.set(font_name)
+        self.cfg.font_name = font_name
+        try:
+            sz = int(self.size_entry.get())
+            if sz < 6 or sz > 72:
+                raise ValueError
+            self.cfg.font_size_pt = sz
+            show_success(self, "Font saved", "Print font updated to {} {}pt.".format(font_name, sz))
+        except ValueError:
+            show_error(self, "Invalid size", "Please enter a valid font size between 6 and 72.")
 
     # ------------------------------------------------------------------ #
     def _build_calibration_card(self, parent):
