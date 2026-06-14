@@ -81,35 +81,36 @@ DEATH_LAYOUT = {
 # in two columns: Party A and Party B. Shared fields use the single value X.
 # =========================================================================== #
 # X positions:
-_M_VALUE_X = 91.0     # X for shared single-value fields
-_M_PARTY_A_X = 91.0   # X for Party A column
+_M_VALUE_X = 105.0    # X for shared single-value fields
+_M_PARTY_A_X = 105.0  # X for Party A column
 _M_PARTY_B_X = 150.0  # X for Party B column
 
 MARRIAGE_LAYOUT = {
     # --- shared (single value) fields ---
     # Note: "S.No." is pre-printed on the sheet, so it is NOT printed by us.
-    "number":               (_M_VALUE_X, 52.0),
-    "when_married":         (_M_VALUE_X, 62.0),
-    "signature_of_licensee":(_M_VALUE_X, 156.0),
-    "witnesses":            (_M_VALUE_X, 167.0),
-    "place_solemnized":     (_M_VALUE_X, 178.0),
+    "number":               (_M_VALUE_X, 47.0),
+    "when_married":         (_M_VALUE_X, 57.0),
+    "signature_of_licensee":(_M_VALUE_X, 142.0),
+    "place_solemnized":     (_M_VALUE_X, 162.0),
     # certifying paragraph + footer
-    "registrar_name":       (140.0, 260.0),
-    "witness_day":          (48.0, 220.5),
-    "witness_month_year":   (98.0, 220.5),
+    "registrar_name":       (10.0, 171.0),
+    "witness_day":          (50.0, 214.0),
+    "witness_month":        (98.0, 214.0),
+    "witness_year":         (166.0, 214.0),
 }
 
 # Per-party fields: each maps to a y_mm; the engine uses PARTY_A_X / PARTY_B_X.
 MARRIAGE_PARTY_LAYOUT = {
     # field                       : y_mm
-    "name_of_party":               72.0,
-    "surname":                     82.0,
-    "age":                         92.0,
-    "condition":                   102.0,
-    "rank_or_profession":          112.0,
-    "residence_at_marriage":       124.0,
-    "fathers_name":                134.0,
-    "signature_contracting_party": 145.0,
+    "name_of_party":               67.0,
+    "surname":                     77.0,
+    "age":                         86.0,
+    "condition":                   96.0,
+    "rank_or_profession":          106.0,
+    "residence_at_marriage":       113.0,
+    "fathers_name":                123.0,
+    "signature_contracting_party": 132.0,
+    "witness_signature":           152.0,
 }
 MARRIAGE_PARTY_X = {"A": _M_PARTY_A_X, "B": _M_PARTY_B_X}
 
@@ -212,10 +213,12 @@ MARRIAGE_TEMPLATE = {
         (12.0,  167.0, "WITNESSES"),
         (12.0,  178.0, "PLACE WHERE MARRIAGE WAS SOLEMNIZED"),
         (160.0, 47.0, "S.No."),
-        (12.0,  195.0, "Diocesan Registrar, Diocese of Madura and"),
-        (12.0,  201.0, "Ramnad, certifies that this is true record in"),
-        (12.0,  207.0, "the Register of Copy of Marriage Returns."),
-        (12.0,  222.0, "Witness my hand........................day of........................................"),
+        (12.0,  195.0, "_______________ Diocesan Registrar, Diocese of Madura and Ramnad, A.V.H. Building,"),
+        (12.0,  201.0, "162, East veli St, Madurai-1, Certifies that this is true record in the Registrer of Copy"),
+        (12.0,  207.0, "of Marriage Returns sent to the Registrar General of Births, Deaths and Marriage which is kept in the"),
+        (12.0,  213.0, "office of the Diocesan Registrar. Diocese of Madura and Ramnad, A.V.H. Building, 162, East Veli St,"),
+        (12.0,  219.0, "Madurai-1."),
+        (12.0,  232.0, "Witness my hand the _________ day of _____________ Two thousand and _________"),
         (150.0, 270.0, "Diocesan Registrar"),
     ],
     "colon_x": 88.0,

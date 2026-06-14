@@ -96,14 +96,30 @@ def collect_items(form_type, data):
         if not val:
             items.append((cx, cy, "—"))
             return
-        if fld == "witness_day":
-            import re
-            m = re.match(r"^(\d+)(ST|ND|RD|TH)$", val, re.IGNORECASE)
-            if m:
-                prefix, suffix = m.groups()
-                items.append((cx, cy, prefix))
-                items.append((cx + len(prefix) * 2.2, cy, suffix.upper(), True))
-                return
+
+        import re
+        m = re.search(r"(\d+)(ST|ND|RD|TH)\b", val, re.IGNORECASE)
+        if m:
+            before = val[:m.start()]
+            num = m.group(1)
+            suf = m.group(2).lower()
+            after = val[m.end():]
+            
+            curr_x = cx
+            if before:
+                items.append((curr_x, cy, before))
+                curr_x += len(before) * 2.54
+            
+            items.append((curr_x, cy, num))
+            curr_x += len(num) * 2.54
+            
+            items.append((curr_x, cy, suf, True))
+            curr_x += len(suf) * 1.5
+            
+            if after:
+                items.append((curr_x, cy, after))
+            return
+            
         items.append((cx, cy, val))
 
     # Shared / single-value fields.
@@ -112,17 +128,29 @@ def collect_items(form_type, data):
         value = "" if value is None else str(value).strip()
         add_item(field, x_mm, y_mm, value)
 
-    # Marriage: two party columns.
+    # Marriage: party fields combined.
     if form_type == "marriage":
         party_layout = form["party_layout"]
-        party_x = form["party_x"]
         parties = data.get("parties", {}) or {}
-        for side, x_mm in party_x.items():
-            party = parties.get(side, {}) or {}
-            for field, y_mm in party_layout.items():
-                value = party.get(field, "")
-                value = "" if value is None else str(value).strip()
-                add_item(field, x_mm, y_mm, value)
+        party_a = parties.get("A", {}) or {}
+        party_b = parties.get("B", {}) or {}
+        
+        x_mm = layouts._M_VALUE_X
+        for field, y_mm in party_layout.items():
+            raw_a = str(party_a.get(field, "") or "").strip()
+            raw_b = str(party_b.get(field, "") or "").strip()
+            
+            # Use single dash '-' instead of em-dash '—' for empty fields
+            val_a = raw_a if raw_a not in ("", "—") else "-"
+            val_b = raw_b if raw_b not in ("", "—") else "-"
+            
+            # "in between signature and witness - is not required"
+            if field in ("signature_contracting_party", "witness_signature"):
+                combined = f"{val_a}          {val_b}"
+            else:
+                combined = f"{val_a} - {val_b}"
+                
+            add_item(field, x_mm, y_mm, combined)
 
     return items
 

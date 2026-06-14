@@ -18,3 +18,28 @@ for diosen regieister i need to be  25 mm for left to right 147 mm from top to b
 
     55 mm from left to right and 194 mm from top to bottom for witness date
 91 mm from left to right and 194 mm from top to bottom for witness month and year
+
+
+for marriage extract i have exact mm where it need start from left to right and top to bottom for each field exactly remeber all 3 sheet's are pre printened and custom sizes each
+
+left to right 105 mm for death extract from top to bottom
+
+1. 50 mm for number,
+2. 60 mm for when married
+3. 70 mm for name of parites
+4. 80 mm for surname
+5. 89 mm for age
+6. 99 mm for condition
+7. 109 mm for rank of proffesion
+8. 116 mm for residence at the time of marriage
+9. 126 mm for father's name
+10. 135 mm for signatre of contracting parties
+11. 145 mm for signatre of license
+12. 155mm for witness
+13. 165mm for place where marriage was solemnized
+
+for diosen regieister i need to be  10 mm for left to right 174 mm from top to bottom,
+
+    50 mm from left to right and 217 mm from top to bottom for witness day
+98 mm from left to right and 217 mm from top to bottom for witness month
+166 mm from left to right and 217 mm from top to bottom for witness  year

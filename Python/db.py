@@ -38,13 +38,13 @@ DEATH_FIELDS = [
 MARRIAGE_FIELDS = [
     "serial_no", "number", "when_married", "place_solemnized", "witnesses",
     "signature_of_licensee", "registrar_name",
-    "witness_day", "witness_month_year",
+    "witness_day", "witness_month", "witness_year",
 ]
 
 MARRIAGE_PARTY_FIELDS = [
     "side", "name_of_party", "surname", "age", "condition",
     "rank_or_profession", "residence_at_marriage", "fathers_name",
-    "signature_contracting_party",
+    "signature_contracting_party", "witness_signature",
 ]
 
 BAPTISM_FIELDS = [
@@ -163,6 +163,17 @@ class Database:
         try:
             cur.execute("ALTER TABLE marriage_return ADD COLUMN witness_day TEXT")
             cur.execute("ALTER TABLE marriage_return ADD COLUMN witness_month_year TEXT")
+            cur.execute("ALTER TABLE marriage_return ADD COLUMN witness_month TEXT")
+            cur.execute("ALTER TABLE marriage_return ADD COLUMN witness_year TEXT")
+        except sqlite3.OperationalError:
+            try:
+                cur.execute("ALTER TABLE marriage_return ADD COLUMN witness_month TEXT")
+                cur.execute("ALTER TABLE marriage_return ADD COLUMN witness_year TEXT")
+            except sqlite3.OperationalError:
+                pass
+
+        try:
+            cur.execute("ALTER TABLE marriage_party ADD COLUMN witness_signature TEXT")
         except sqlite3.OperationalError:
             pass
 

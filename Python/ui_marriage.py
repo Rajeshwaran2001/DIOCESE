@@ -38,12 +38,12 @@ _PARTY_FIELDS = [
     ("residence_at_marriage", "Residence at the Time of Marriage"),
     ("fathers_name", "Father's Name"),
     ("signature_contracting_party", "Signature of Contracting Parties"),
+    ("witness_signature", "Witnesses"),
 ]
 
 # Shared single-value fields shown BELOW the party columns, in sheet order.
 _SHARED_BOTTOM = [
     ("signature_of_licensee", "Signature of the Licensee", False),
-    ("witnesses", "Witnesses", False),
     ("place_solemnized", "Place Where Marriage Was Solemnized", False),
 ]
 
@@ -51,11 +51,12 @@ _SHARED_BOTTOM = [
 _FOOTER = [
     ("registrar_name", "Diocesan Registrar Name", False),
     ("witness_day", "Witness Date - Day", False),
-    ("witness_month_year", "Witness Date - Month & Year", False),
+    ("witness_month", "Witness Date - Month", False),
+    ("witness_year", "Witness Date - Year", False),
 ]
 
 _REQUIRED = [("number", "Number")]
-_DATES = [("when_married", "When Married")]
+_DATES = []
 
 
 class MarriageSection(ctk.CTkFrame):
@@ -151,7 +152,7 @@ class MarriageSection(ctk.CTkFrame):
         # --- NUMBER, WHEN MARRIED (above the party split) --------------- #
         for key, label, required in _SHARED_TOP:
             shared_row(key, label, required=required)
-        shared_row("when_married", "When Married", date=True)
+        shared_row("when_married", "When Married")
 
         # Party A / Party B column headers, just above the per-party rows.
         ctk.CTkLabel(grid, text="Party A", font=HEADING_FONT, anchor="w").grid(
@@ -252,6 +253,17 @@ class MarriageSection(ctk.CTkFrame):
         for w in self.party_b.values():
             w.clear()
         self.editing_id = None
+        
+        # Pre-fill -SD-
+        if "signature_contracting_party" in self.party_a:
+            self.party_a["signature_contracting_party"].set("-SD-")
+        if "signature_contracting_party" in self.party_b:
+            self.party_b["signature_contracting_party"].set("-SD-")
+            
+        if "witness_signature" in self.party_a:
+            self.party_a["witness_signature"].set("-SD-")
+        if "witness_signature" in self.party_b:
+            self.party_b["witness_signature"].set("-SD-")
 
     def _save(self, print_after):
         shared = self._collect_shared()

@@ -1002,16 +1002,6 @@ class PreviewWindow(ctk.CTkToplevel):
                                    (colon_x + 110) * scale, cy + 11 * scale / 2.6,
                                    fill="#cdd3db", dash=(2, 3))
 
-        # Marriage: label the two value columns so A / B are obvious.
+        # Marriage preview used to label columns A / B, but user requested to remove them.
         if form_type == "marriage":
-            party_x = form.get("party_x", {})
-            ax = party_x.get("A")
-            bx = party_x.get("B")
-            if ax is not None:
-                canvas.create_text(ax * scale, 66.0 * scale, text="Party A",
-                                   anchor="nw", fill="#555b66",
-                                   font=(FONT_FAMILY, 8, "bold"))
-            if bx is not None:
-                canvas.create_text(bx * scale, 66.0 * scale, text="Party B",
-                                   anchor="nw", fill="#555b66",
-                                   font=(FONT_FAMILY, 8, "bold"))
+            pass
