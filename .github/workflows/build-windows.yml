@@ -10,13 +10,19 @@ on:
     paths:
       - "Python/**"
       - ".github/workflows/build-windows.yml"
-    tags:
-      - "v*"
   pull_request:
     paths:
       - "Python/**"
       - ".github/workflows/build-windows.yml"
-  workflow_dispatch: # allow manual runs from the Actions tab
+  # Manual release: run from the Actions tab, type a version. The workflow
+  # builds, then creates the git tag on the latest commit and publishes a
+  # GitHub Release with the zip + installer attached.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 1.0.1 (a 'v' is added automatically). Leave the run a plain build by NOT using this trigger."
+        required: true
+        type: string
 
 permissions:
   contents: write # needed to upload assets to a GitHub Release
@@ -31,6 +37,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Determine version
+        id: ver
+        shell: bash
+        run: |
+          # Read from version.txt by default
+          v=$(cat version.txt | tr -d '\r\n' | tr -d 'v')
+          
+          # Override if this is a manual release
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            v="${{ github.event.inputs.version }}"
+            v="${v#v}"
+            # Overwrite version.txt so Nuitka embeds the release version
+            echo "$v" > version.txt
+          fi
+          
+          # Nuitka expects a 4-part version (e.g. 1.0.0.0)
+          nuitka_v="$v"
+          dots=$(echo "$nuitka_v" | tr -cd '.' | wc -c)
+          if [ "$dots" -eq 2 ]; then
+            nuitka_v="${nuitka_v}.0"
+          fi
+          
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "nuitka_version=$nuitka_v" >> "$GITHUB_OUTPUT"
+          echo "Release tag: v$v"
+          echo "Nuitka version: $nuitka_v"
 
       # Python 3.8 is the last release that supports Windows 7, which is the
       # deployment target for this app — keep it pinned.
@@ -59,10 +93,11 @@ jobs:
             --windows-icon-from-ico=assets\app.ico `
             --include-package-data=customtkinter `
             --include-data-dir=assets=assets `
+            --include-data-files=version.txt=version.txt `
             --company-name="Diocese of Madurai Ramnad CSI" `
             --product-name="Diocese Certificate Manager" `
-            --file-version=1.0.0.0 `
-            --product-version=1.0.0.0 `
+            --file-version=${{ steps.ver.outputs.nuitka_version }} `
+            --product-version=${{ steps.ver.outputs.nuitka_version }} `
             --file-description="Certificate data entry and printing" `
             --copyright="Diocese of Madurai Ramnad CSI" `
             --output-dir=dist `
@@ -101,7 +136,7 @@ jobs:
 
       - name: Build installer
         working-directory: Python/installer
-        run: iscc setup.iss
+        run: iscc /dMyAppVersion=${{ steps.ver.outputs.version }} setup.iss
 
       - name: Verify installer output
         run: |
@@ -118,11 +153,17 @@ jobs:
           path: Python/installer/Output/DioceseCertManager-Setup.exe
           if-no-files-found: error
 
-      # Only when a v* tag is pushed: attach both the zip and the installer to a Release.
+      # --- Release (manual only) ----------------------------------------------
+
+      # Creates the tag on the commit this run was started from (the latest
+      # commit of the selected branch) and publishes the Release with assets.
       - name: Publish to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: |
             Python/DioceseCertificateManager-windows.zip
             Python/installer/Output/DioceseCertManager-Setup.exe

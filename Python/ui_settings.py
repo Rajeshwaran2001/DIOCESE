@@ -13,12 +13,14 @@ Settings screen:
 import os
 from tkinter import filedialog
 
+import backup as backup_mod
+
 import customtkinter as ctk
 
 import layouts
 import printing
 from ui_common import (
-    Card, show_success, show_error, show_info, confirm,
+    Card, show_success, show_error, show_info, confirm, prompt_password,
     TITLE_FONT, HEADING_FONT, BUTTON_FONT, LABEL_FONT, SMALL_FONT,
     CORNER, PAD,
     primary_button, secondary_button,
@@ -42,9 +44,11 @@ class SettingsSection(ctk.CTkFrame):
         ctk.CTkLabel(view, text="Settings", font=TITLE_FONT, anchor="w"
                      ).pack(fill="x", padx=PAD, pady=(PAD, 0))
 
+        self._build_backup_card(view)
+        self._build_security_card(view)
+        self._build_printer_card(view)
         self._build_data_card(view)
         self._build_appearance_card(view)
-        self._build_printer_card(view)
         self._build_calibration_card(view)
 
     # ------------------------------------------------------------------ #
@@ -72,8 +76,8 @@ class SettingsSection(ctk.CTkFrame):
             return
         if not confirm(self, "Move database location",
                        "Use this folder for the database?\n\n{}\n\n"
-                       "A new diocese.db will be created here if one doesn't "
-                       "exist.".format(folder)):
+                       "A new encrypted database will be created here if one "
+                       "doesn't exist.".format(folder)):
             return
         try:
             self.app.set_data_path(folder)
@@ -82,7 +86,7 @@ class SettingsSection(ctk.CTkFrame):
             return
         self.path_label.configure(text=self.cfg.data_path)
         show_success(self, "Database folder updated",
-                     "Now using:\n{}".format(self.cfg.db_file))
+                     "Now using:\n{}".format(self.cfg.data_path))
 
     # ------------------------------------------------------------------ #
     def _build_appearance_card(self, parent):
@@ -242,3 +246,186 @@ class SettingsSection(ctk.CTkFrame):
         show_info(self, "Alignment test sent",
                   "A marker sheet was sent to the printer. Overlay it on a real "
                   "form and adjust the X/Y offset until the markers sit on the lines.")
+
+    # ------------------------------------------------------------------ #
+    # Security: app-open password
+    # ------------------------------------------------------------------ #
+    def _build_security_card(self, parent):
+        card = Card(parent, title="Security")
+        card.pack(fill="x", padx=PAD, pady=(PAD, PAD))
+        self.security_body = ctk.CTkFrame(card, fg_color="transparent")
+        self.security_body.pack(fill="x", padx=PAD, pady=(0, PAD))
+        self._refresh_security_body()
+
+    def _refresh_security_body(self):
+        body = self.security_body
+        for child in body.winfo_children():
+            child.destroy()
+
+        has = self.cfg.has_password()
+        status = ("A password is required each time the app opens."
+                  if has else
+                  "No password set. The app opens without asking.")
+        ctk.CTkLabel(body, text=status, font=SMALL_FONT, text_color="gray",
+                     anchor="w", justify="left", wraplength=560
+                     ).pack(fill="x", pady=(0, 8))
+
+        row = ctk.CTkFrame(body, fg_color="transparent")
+        row.pack(fill="x")
+        if has:
+            primary_button(row, "Change password",
+                           command=self._change_password,
+                           font=SMALL_FONT, width=160, height=36
+                           ).pack(side="left", padx=(0, 8))
+            secondary_button(row, "Remove password",
+                             command=self._remove_password,
+                             font=SMALL_FONT, width=160, height=36
+                             ).pack(side="left")
+        else:
+            primary_button(row, "Set password",
+                           command=self._set_password,
+                           font=SMALL_FONT, width=160, height=36
+                           ).pack(side="left")
+
+        # Auto-lock after inactivity (only meaningful when a password is set).
+        lock_row = ctk.CTkFrame(body, fg_color="transparent")
+        lock_row.pack(fill="x", pady=(10, 0))
+        ctk.CTkLabel(lock_row, text="Auto-lock after", font=LABEL_FONT,
+                     width=120, anchor="w").pack(side="left")
+        self.lock_menu = ctk.CTkOptionMenu(
+            lock_row, values=list(self._LOCK_CHOICES.keys()), font=BUTTON_FONT,
+            width=150, command=self._set_lock_timeout)
+        self.lock_menu.set(self._lock_label_for(self.cfg.lock_timeout_min))
+        self.lock_menu.pack(side="left")
+        if not has:
+            ctk.CTkLabel(lock_row, text="(set a password to use this)",
+                         font=SMALL_FONT, text_color="gray"
+                         ).pack(side="left", padx=8)
+
+    # label -> minutes (0 = never)
+    _LOCK_CHOICES = {
+        "Never": 0, "1 minute": 1, "5 minutes": 5,
+        "10 minutes": 10, "15 minutes": 15, "30 minutes": 30,
+    }
+
+    def _lock_label_for(self, minutes):
+        for label, mins in self._LOCK_CHOICES.items():
+            if mins == minutes:
+                return label
+        return "5 minutes"
+
+    def _set_lock_timeout(self, label):
+        self.cfg.lock_timeout_min = self._LOCK_CHOICES.get(label, 5)
+
+    def _ask_new_password(self):
+        """Prompt for a new password (with confirmation). Returns str or None."""
+        return prompt_password(
+            self, "Set password",
+            "Enter a password. You will be asked for it each time the app opens.",
+            confirm_field=True)
+
+    def _verify_current(self):
+        """Ask for the current password; True if correct (or none set)."""
+        if not self.cfg.has_password():
+            return True
+        current = prompt_password(self, "Confirm current password",
+                                  "Enter your current password to continue.")
+        if current is None:
+            return False
+        if not self.cfg.verify_password(current):
+            show_error(self, "Incorrect password",
+                       "The current password is not correct.")
+            return False
+        return True
+
+    def _set_password(self):
+        new = self._ask_new_password()
+        if new is None:
+            return
+        self.cfg.set_password(new)
+        self._refresh_security_body()
+        show_success(self, "Password set",
+                     "The app will now ask for this password on startup.")
+
+    def _change_password(self):
+        if not self._verify_current():
+            return
+        new = self._ask_new_password()
+        if new is None:
+            return
+        self.cfg.set_password(new)
+        self._refresh_security_body()
+        show_success(self, "Password changed", "Your new password is saved.")
+
+    def _remove_password(self):
+        if not self._verify_current():
+            return
+        if not confirm(self, "Remove password",
+                       "Remove the password? The app will open without asking."):
+            return
+        self.cfg.set_password("")
+        self._refresh_security_body()
+        show_success(self, "Password removed",
+                     "The app will no longer ask for a password.")
+
+    # ------------------------------------------------------------------ #
+    # Backup & Restore
+    # ------------------------------------------------------------------ #
+    def _build_backup_card(self, parent):
+        card = Card(parent, title="Backup & Restore")
+        card.pack(fill="x", padx=PAD, pady=(PAD, PAD))
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="x", padx=PAD, pady=(0, PAD))
+
+        # -- Backup section --
+        ctk.CTkLabel(
+            body,
+            text="Save an encrypted copy of the database to a USB / external "
+                 "drive. The backup includes the recovery key so it can be "
+                 "restored on any PC from a single zip file.",
+            font=SMALL_FONT, text_color="gray", anchor="w", justify="left",
+            wraplength=560).pack(fill="x", pady=(0, 8))
+
+        backup_row = ctk.CTkFrame(body, fg_color="transparent")
+        backup_row.pack(fill="x")
+        primary_button(backup_row, "Backup to USB drive…",
+                       command=self._backup_now,
+                       font=SMALL_FONT, width=190, height=36
+                       ).pack(side="left", padx=(0, 8))
+        secondary_button(backup_row, "Save recovery key…",
+                         command=self._save_recovery_key,
+                         font=SMALL_FONT, width=190, height=36
+                         ).pack(side="left")
+
+        # -- Divider --
+        ctk.CTkFrame(body, height=1, fg_color=("#CBD5E1", "#334155")
+                     ).pack(fill="x", pady=(16, 8))
+
+        # -- Restore section --
+        ctk.CTkLabel(
+            body, text="Restore from Backup",
+            font=("Segoe UI", 14, "bold"), anchor="w"
+        ).pack(fill="x", pady=(0, 4))
+        ctk.CTkLabel(
+            body,
+            text="Pick a diocese backup zip to restore all records. "
+                 "The current database will be replaced. "
+                 "Use the same zip file from Settings → Backup to USB drive.",
+            font=SMALL_FONT, text_color="gray", anchor="w", justify="left",
+            wraplength=560).pack(fill="x", pady=(0, 8))
+
+        restore_row = ctk.CTkFrame(body, fg_color="transparent")
+        restore_row.pack(fill="x")
+        secondary_button(restore_row, "Restore from backup…",
+                         command=self._restore_backup,
+                         font=SMALL_FONT, width=200, height=36
+                         ).pack(side="left")
+
+    def _backup_now(self):
+        self.app.do_backup(self)
+
+    def _save_recovery_key(self):
+        self.app.do_save_recovery_key(self)
+
+    def _restore_backup(self):
+        self.app.do_restore_backup(self)

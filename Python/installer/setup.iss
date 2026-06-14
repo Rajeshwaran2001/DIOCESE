@@ -17,7 +17,9 @@
 ; ===========================================================================
 
 #define MyAppName "Diocese Certificate Manager"
+#ifndef MyAppVersion
 #define MyAppVersion "1.0.0"
+#endif
 #define MyAppPublisher "Diocese of Madurai Ramnad CSI"
 #define MyAppExeName "main.exe"
 

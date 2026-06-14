@@ -61,8 +61,12 @@ def _now():
 
 
 class Database:
-    def __init__(self, db_file):
+    def __init__(self, db_file, on_commit=None):
         self.db_file = db_file
+        # Called after every committed write. Used by the encryption layer to
+        # re-encrypt the working file back to disk so a crash can't leave recent
+        # changes only in the plaintext working copy.
+        self._on_commit = on_commit
         os.makedirs(os.path.dirname(db_file), exist_ok=True)
         # check_same_thread False: CustomTkinter callbacks all run on the main
         # thread anyway, but this keeps us safe if a print runs in a worker.
@@ -70,6 +74,12 @@ class Database:
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self._migrate()
+
+    def _commit(self):
+        """Commit, then notify the encryption layer (if any)."""
+        self.conn.commit()
+        if self._on_commit is not None:
+            self._on_commit()
 
     # ------------------------------------------------------------------ #
     # Schema creation / migration
@@ -171,7 +181,7 @@ class Database:
             ", ".join(cols), placeholders
         )
         cur = self.conn.execute(sql, values)
-        self.conn.commit()
+        self._commit()
         return cur.lastrowid
 
     def update_death(self, rec_id, data):
@@ -181,7 +191,7 @@ class Database:
             "UPDATE death_extract SET {}, updated_at=? WHERE id=?".format(assignments),
             values,
         )
-        self.conn.commit()
+        self._commit()
 
     def get_death(self, rec_id):
         row = self.conn.execute(
@@ -191,7 +201,7 @@ class Database:
 
     def delete_death(self, rec_id):
         self.conn.execute("DELETE FROM death_extract WHERE id=?", (rec_id,))
-        self.conn.commit()
+        self._commit()
 
     def search_death(self, query=""):
         like = "%{}%".format(query.strip())
@@ -218,7 +228,7 @@ class Database:
         marriage_id = cur.lastrowid
         self._insert_party(marriage_id, "A", party_a)
         self._insert_party(marriage_id, "B", party_b)
-        self.conn.commit()
+        self._commit()
         return marriage_id
 
     def _insert_party(self, marriage_id, side, party):
@@ -246,7 +256,7 @@ class Database:
         self.conn.execute("DELETE FROM marriage_party WHERE marriage_id=?", (rec_id,))
         self._insert_party(rec_id, "A", party_a)
         self._insert_party(rec_id, "B", party_b)
-        self.conn.commit()
+        self._commit()
 
     def get_marriage(self, rec_id):
         row = self.conn.execute(
@@ -267,7 +277,7 @@ class Database:
     def delete_marriage(self, rec_id):
         # ON DELETE CASCADE removes the party rows.
         self.conn.execute("DELETE FROM marriage_return WHERE id=?", (rec_id,))
-        self.conn.commit()
+        self._commit()
 
     def search_marriage(self, query=""):
         like = "%{}%".format(query.strip())
@@ -310,7 +320,7 @@ class Database:
             ", ".join(cols), placeholders
         )
         cur = self.conn.execute(sql, values)
-        self.conn.commit()
+        self._commit()
         return cur.lastrowid
 
     def update_baptism(self, rec_id, data):
@@ -320,7 +330,7 @@ class Database:
             "UPDATE baptism SET {}, updated_at=? WHERE id=?".format(assignments),
             values,
         )
-        self.conn.commit()
+        self._commit()
 
     def get_baptism(self, rec_id):
         row = self.conn.execute(
@@ -330,7 +340,7 @@ class Database:
 
     def delete_baptism(self, rec_id):
         self.conn.execute("DELETE FROM baptism WHERE id=?", (rec_id,))
-        self.conn.commit()
+        self._commit()
 
     def search_baptism(self, query=""):
         like = "%{}%".format(query.strip())

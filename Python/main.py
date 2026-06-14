@@ -18,7 +18,9 @@ Build with: build.bat  (Nuitka standalone)
 import os
 import sys
 import glob
+import time
 import tkinter as tk
+from tkinter import filedialog
 
 
 def _ensure_tcl_tk():
@@ -53,6 +55,10 @@ import customtkinter as ctk
 
 from config import Config
 from db import Database
+from secure_store import SecureStore, CryptoError
+import backup
+import secure_store
+import ui_help
 import ui_common
 from ui_death import DeathSection
 from ui_marriage import MarriageSection
@@ -98,9 +104,36 @@ class App(ctk.CTk):
         self.geometry("1180x760")
         self.minsize(960, 620)
 
-        # Open the database (graceful failure dialog).
+        # Password gate: if a password is configured, hide the main window and
+        # require it before anything is built. Cancelling closes the app.
+        # NOTE: we use window alpha instead of withdraw/deiconify because the
+        # standalone Tk shipped by uv (python-build-standalone) does not
+        # reliably restore the window after withdraw().
+        self.aborted = False
         self.db = None
-        if not self._open_database(self.config.db_file):
+        self.store = None
+
+        # First-launch bootstrap: if no password has ever been set, install the
+        # default password now so the gate always runs and the user is forced to
+        # change it immediately (see _check_default_password below).
+        if not self.config.has_password():
+            self.config.set_password("admin123")
+
+        if self.config.has_password():
+            self.attributes('-alpha', 0)          # invisible but exists
+            if not self._password_gate():
+                self.aborted = True
+                self.destroy()
+                return
+            # Force a password change when the default password is still in use.
+            if not self._check_default_password():
+                self.aborted = True
+                self.destroy()
+                return
+            self.attributes('-alpha', 1)          # reveal after unlock
+
+        # Open the (encrypted) database (graceful failure dialog).
+        if not self._open_database(self.config.data_path):
             return
 
         self.sections = {}        # name -> frame instance (lazy)
@@ -115,6 +148,9 @@ class App(ctk.CTk):
         # pausing to construct their (large) forms. Staggered so the UI stays
         # responsive while they build.
         self.after(120, self._prewarm_sections)
+
+        # Re-lock the app after a period of inactivity (if a password is set).
+        self._start_idle_lock()
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -139,24 +175,258 @@ class App(ctk.CTk):
                 return
 
     # ------------------------------------------------------------------ #
-    # Database lifecycle
+    # Security: require the app password before showing the window
     # ------------------------------------------------------------------ #
-    def _open_database(self, db_file):
+    def _password_gate(self):
+        """Return True to proceed, False to abort (cancelled/closed)."""
+        if not self.config.has_password():
+            return True
+        return self._unlock_loop()
+
+    def _unlock_loop(self):
+        """Prompt for the password until correct (True) or cancelled (False).
+
+        Wrong attempts are throttled with a growing delay (login throttling).
+        """
+        attempts = 0
+        while True:
+            pw = ui_common.prompt_password(
+                self, "Unlock", "Enter the application password to continue.")
+            if pw is None:
+                return False  # cancelled / window closed
+            if self.config.verify_password(pw):
+                return True
+            attempts += 1
+            delay = min(attempts, 10)  # seconds: 1,2,3,... capped at 10
+            ui_common.show_error(
+                self, "Incorrect password",
+                "That password is not correct.\n\n"
+                "Please wait {} second(s) before trying again.".format(delay))
+            time.sleep(delay)
+
+    _DEFAULT_PASSWORD = "admin123"
+
+    def _check_default_password(self):
+        """Force the user to change the password if the default one is still set.
+
+        Returns True to continue opening the app, False to abort (user cancelled).
+        Uses a single dialog (warning embedded in the prompt) so the happy path
+        is only ONE extra popup after the login prompt.
+        """
+        if not self.config.verify_password(self._DEFAULT_PASSWORD):
+            return True   # not the default password — no action needed
+
+        while True:
+            new_pw = ui_common.prompt_password(
+                self, "Change Required — Default Password Detected",
+                "Your account is still using the default password.\n\n"
+                "Please set a new password to secure the application. "
+                "You cannot skip this step.",
+                confirm_field=True)
+            if new_pw is None:
+                return False          # cancelled — abort the app
+            if new_pw == self._DEFAULT_PASSWORD:
+                ui_common.show_error(
+                    self, "Choose a different password",
+                    "That password is not allowed. Please pick a new one.")
+                continue
+            self.config.set_password(new_pw)
+            return True               # app opens immediately — no success popup
+
+    # ------------------------------------------------------------------ #
+    # Idle auto-lock: re-require the password after inactivity
+    # ------------------------------------------------------------------ #
+    def _start_idle_lock(self):
+        """Begin watching for inactivity (no-op if no password is set)."""
+        self._locked = False
+        self._last_activity = time.monotonic()
+        self._idle_after_id = None
+        # Any of these user actions counts as activity.
+        for seq in ("<Key>", "<Button>", "<Motion>", "<MouseWheel>"):
+            self.bind_all(seq, self._reset_activity, add="+")
+        self._schedule_idle_check()
+
+    def _reset_activity(self, _event=None):
+        self._last_activity = time.monotonic()
+
+    def _schedule_idle_check(self):
+        if self._idle_after_id is not None:
+            try:
+                self.after_cancel(self._idle_after_id)
+            except Exception:
+                pass
+        self._idle_after_id = self.after(15000, self._idle_check)  # every 15s
+
+    def _idle_check(self):
+        self._idle_after_id = None
+        if self._locked:
+            return  # a lock prompt is already up; it reschedules on unlock
+        timeout_min = self.config.lock_timeout_min
+        if self.config.has_password() and timeout_min > 0:
+            idle = time.monotonic() - self._last_activity
+            if idle >= timeout_min * 60:
+                self._lock_screen()
+                return
+        self._schedule_idle_check()
+
+    def _lock_screen(self):
+        """Hide the window and require the password again."""
+        if self._locked or not self.config.has_password():
+            return
+        self._locked = True
+        self.attributes('-alpha', 0)
+        if self._unlock_loop():
+            self.attributes('-alpha', 1)
+            self._locked = False
+            self._reset_activity()
+            self._schedule_idle_check()
+        else:
+            self._on_close()
+
+    # ------------------------------------------------------------------ #
+    # Backup / recovery (shared by the menu bar and the Settings screen)
+    # ------------------------------------------------------------------ #
+    def do_backup(self, parent):
+        """Back up the encrypted database to a chosen external (USB) drive."""
+        if self.store is None:
+            ui_common.show_error(parent, "Not ready",
+                                 "The database is not open yet.")
+            return
+        drives = backup.list_external_drives()
+        if not drives:
+            ui_common.show_error(
+                parent, "No external drive found",
+                "Insert a USB / external drive and try again.\n\n"
+                "(Backups are only written to removable drives.)")
+            return
+
+        label_to_root, labels = {}, []
+        for root, vol in drives:
+            label = root if not vol else "{}  ({})".format(root, vol)
+            labels.append(label)
+            label_to_root[label] = root
+
+        if len(labels) == 1:
+            dest_root = label_to_root[labels[0]]
+        else:
+            picked = ui_common.choose(
+                parent, "Choose drive",
+                "Select the external drive to back up to:", labels)
+            if picked is None:
+                return
+            dest_root = label_to_root[picked]
+
+        try:
+            dest = backup.make_backup(self.store.enc_path, dest_root)
+        except backup.BackupError as exc:
+            ui_common.show_error(parent, "Backup failed", str(exc))
+            return
+        ui_common.show_success(parent, "Backup complete",
+                               "Encrypted backup saved to:\n{}".format(dest))
+
+    def do_save_recovery_key(self, parent):
+        """Export the encryption key so a backup can be restored on a new PC."""
+        path = filedialog.asksaveasfilename(
+            title="Save recovery key",
+            defaultextension=".key",
+            initialfile="diocese-recovery.key",
+            filetypes=[("Recovery key", "*.key"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            secure_store.export_recovery_key(path)
+        except Exception as exc:
+            ui_common.show_error(parent, "Could not save key", str(exc))
+            return
+        ui_common.show_info(
+            parent, "Recovery key saved",
+            "Keep this file safe and SEPARATE from your backups. Anyone with "
+            "both the backup and this key can read the records.")
+
+    def do_restore_backup(self, parent):
+        """Restore the database from a backup zip chosen by the user."""
+        zip_path = filedialog.askopenfilename(
+            parent=parent,
+            title="Choose a Diocese backup zip to restore",
+            filetypes=[("Diocese backup", "*.zip"), ("All files", "*.*")])
+        if not zip_path:
+            return
+
+        if not ui_common.confirm(
+                parent, "Restore from backup",
+                "This will REPLACE the current database with the contents of:\n"
+                "{}\n\n"
+                "All unsaved changes will be lost. Continue?".format(zip_path)):
+            return
+
+        # Close the current DB so we can safely overwrite the .enc file.
         try:
             if self.db is not None:
                 self.db.close()
-            self.db = Database(db_file)
+            if self.store is not None:
+                self.store.close()
+        except Exception:
+            pass
+        self.db = None
+        self.store = None
+
+        try:
+            backup.restore_backup(zip_path, self.config.data_path)
+        except backup.BackupError as exc:
+            ui_common.show_error(parent, "Restore failed", str(exc))
+            # Re-open the original database so the app keeps working.
+            self._open_database(self.config.data_path)
+            return
+
+        # Reload the (now restored) database.
+        if not self._open_database(self.config.data_path):
+            return
+
+        # Rebuild every section so they read from the restored DB.
+        for _name, frame in list(self.sections.items()):
+            frame.destroy()
+        self.sections.clear()
+        self.show_section("death")
+
+        ui_common.show_success(
+            parent, "Restore complete",
+            "The database has been restored successfully. "
+            "All records from the backup are now available.")
+
+    # ------------------------------------------------------------------ #
+    # Database lifecycle
+    # ------------------------------------------------------------------ #
+    def _open_database(self, data_dir):
+        """Decrypt + open the database stored in ``data_dir``.
+
+        The on-disk database is AES-encrypted; SecureStore decrypts it to a
+        private working copy and re-encrypts after every write (and on close).
+        """
+        try:
+            if self.db is not None:
+                self.db.close()
+            if self.store is not None:
+                self.store.close()
+            self.store = SecureStore(data_dir)
+            working = self.store.open()
+            self.db = Database(working, on_commit=self.store.encrypt_back)
             return True
+        except CryptoError as exc:
+            ui_common.show_error(
+                self, "Cannot unlock database",
+                "The encrypted database could not be opened:\n\n{}".format(exc))
+            return False
         except Exception as exc:
             ui_common.show_error(
                 self, "Cannot open database",
-                "The database could not be opened at:\n{}\n\n{}".format(db_file, exc))
+                "The database could not be opened in:\n{}\n\n{}".format(
+                    data_dir, exc))
             return False
 
     def set_data_path(self, folder):
         """Point the app at a new database folder and rebuild the sections."""
         self.config.data_path = folder
-        if not self._open_database(self.config.db_file):
+        if not self._open_database(self.config.data_path):
             raise RuntimeError("Failed to open database in new folder.")
         # Drop cached sections so they re-read from the new DB.
         for name, frame in list(self.sections.items()):
@@ -190,6 +460,7 @@ class App(ctk.CTk):
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_rowconfigure(2, weight=1)  # spacer row pushes footer down
 
+        self._build_menubar()
         self._build_brand()
         self._build_nav()
         self._build_sidebar_footer()
@@ -198,6 +469,57 @@ class App(ctk.CTk):
         self.content.grid(row=0, column=1, sticky="nsew")
         self.content.grid_columnconfigure(0, weight=1)
         self.content.grid_rowconfigure(0, weight=1)
+
+    def _build_menubar(self):
+        """Native menu bar: File / Help / About."""
+        menubar = tk.Menu(self)
+
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Backup to USB drive…",
+                              command=lambda: self.do_backup(self))
+        file_menu.add_command(label="Save recovery key…",
+                              command=lambda: self.do_save_recovery_key(self))
+        file_menu.add_command(label="Restore from backup…",
+                              command=lambda: self.do_restore_backup(self))
+        file_menu.add_separator()
+        file_menu.add_command(label="Settings",
+                              command=lambda: self.show_section("settings"))
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self._on_close)
+        menubar.add_cascade(label="File", menu=file_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(
+            label="Overview / User Guide",
+            command=lambda: ui_help.open_help(self, "overview"))
+        help_menu.add_separator()
+        help_menu.add_command(
+            label="Death Extract screen",
+            command=lambda: ui_help.open_help(self, "death"))
+        help_menu.add_command(
+            label="Marriage Returns screen",
+            command=lambda: ui_help.open_help(self, "marriage"))
+        help_menu.add_command(
+            label="Baptism Certificate screen",
+            command=lambda: ui_help.open_help(self, "baptism"))
+        help_menu.add_command(
+            label="Settings screen",
+            command=lambda: ui_help.open_help(self, "settings"))
+        menubar.add_cascade(label="Help", menu=help_menu)
+
+        menubar.add_command(label="About",
+                            command=lambda: ui_help.open_about(self))
+
+        # Attach to the window. self.config is shadowed by the Config object, so
+        # set the native -menu option directly to stay robust.
+        try:
+            self.tk.call(self._w, "configure", "-menu", menubar)
+        except Exception:
+            try:
+                self.configure(menu=menubar)
+            except Exception:
+                pass
+        self._menubar = menubar  # keep a reference
 
     def _build_brand(self):
         brand = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -335,13 +657,31 @@ class App(ctk.CTk):
                 self.db.close()
         except Exception:
             pass
+        try:
+            # Final re-encrypt + delete the plaintext working copy.
+            if self.store is not None:
+                self.store.close()
+        except Exception:
+            pass
         self.destroy()
 
 
 def main():
     app = App()
-    # If the DB failed to open, the window may already be torn down.
+    # If the password prompt was cancelled or the DB failed to open, the window
+    # is already torn down — don't start the event loop.
+    if getattr(app, "aborted", False):
+        return
     if getattr(app, "db", None) is not None:
+        # Schedule maximize for 10 ms after the event loop starts.
+        # Calling state('zoomed') before mainloop() has no effect on the
+        # python-build-standalone Tk that uv ships.
+        def _maximize():
+            try:
+                app.state("zoomed")
+            except Exception:
+                pass
+        app.after(10, _maximize)
         app.mainloop()
 
 

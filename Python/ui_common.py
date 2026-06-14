@@ -155,7 +155,18 @@ class _ModalDialog(ctk.CTkToplevel):
         self.transient(parent)
         self.grab_set()
         self.protocol("WM_DELETE_WINDOW", lambda: self._choose(buttons[0]))
+        self._raise_to_front()
         self.wait_window()
+
+    def _raise_to_front(self):
+        """Bring the dialog above the (possibly maximized) main window."""
+        try:
+            self.attributes("-topmost", True)
+            self.lift()
+            self.focus_force()
+            self.after(200, lambda: self.attributes("-topmost", False))
+        except Exception:
+            pass
 
     def _choose(self, label):
         self.result = label
@@ -163,14 +174,21 @@ class _ModalDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _center(self, parent):
+        """Always center on screen (not relative to parent).
+
+        Centering relative to the parent breaks when the main window is
+        invisible (alpha=0) during the startup password gate — the parent
+        reports position (0, 0) and the dialog appears in the top-left corner.
+        """
         self.update_idletasks()
         try:
-            px, py = parent.winfo_rootx(), parent.winfo_rooty()
-            pw, ph = parent.winfo_width(), parent.winfo_height()
-            w, h = self.winfo_width(), self.winfo_height()
-            x = px + (pw - w) // 2
-            y = py + (ph - h) // 2
-            self.geometry("+{}+{}".format(max(x, 0), max(y, 0)))
+            w = self.winfo_width()
+            h = self.winfo_height()
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            x = max((sw - w) // 2, 0)
+            y = max((sh - h) // 3, 0)   # slightly above centre looks better
+            self.geometry("+{}+{}".format(x, y))
         except Exception:
             pass
 
@@ -195,6 +213,128 @@ def confirm(parent, title, message, ok="Yes", cancel="Cancel"):
     """Return True if the user picked the primary (ok) button."""
     dlg = _ModalDialog(parent, title, message, kind="confirm", buttons=(cancel, ok))
     return dlg.result == ok
+
+
+def choose(parent, title, message, options, cancel="Cancel"):
+    """Show one button per option label; return the chosen label or None."""
+    buttons = tuple(options) + (cancel,)
+    dlg = _ModalDialog(parent, title, message, kind="confirm", buttons=buttons)
+    if dlg.result is None or dlg.result == cancel:
+        return None
+    return dlg.result
+
+
+class _PasswordDialog(ctk.CTkToplevel):
+    """Modal password prompt.
+
+    ``confirm_field=True`` shows a second "confirm" box and requires the two to
+    match (used when setting a new password). ``result`` is the entered string,
+    or ``None`` if the user cancelled / closed the dialog.
+    """
+
+    def __init__(self, parent, title, message, confirm_field=False):
+        super().__init__(parent)
+        self.result = None
+        self._confirm_field = confirm_field
+        self.title(title)
+        self.resizable(False, False)
+
+        container = ctk.CTkFrame(self, corner_radius=0)
+        container.pack(fill="both", expand=True)
+        ctk.CTkFrame(container, fg_color="#2563EB", corner_radius=0, height=8
+                     ).pack(fill="x")
+
+        body = ctk.CTkFrame(container, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=24, pady=20)
+
+        ctk.CTkLabel(body, text=title, font=HEADING_FONT, anchor="w"
+                     ).pack(fill="x")
+        ctk.CTkLabel(body, text=message, font=LABEL_FONT, anchor="w",
+                     justify="left", wraplength=360).pack(fill="x", pady=(4, 12))
+
+        self._entry = ctk.CTkEntry(body, show="•", width=320, font=LABEL_FONT,
+                                   corner_radius=CORNER)
+        self._entry.pack(fill="x")
+        self._entry2 = None
+        if confirm_field:
+            ctk.CTkLabel(body, text="Confirm password", font=LABEL_FONT,
+                         anchor="w").pack(fill="x", pady=(10, 2))
+            self._entry2 = ctk.CTkEntry(body, show="•", width=320,
+                                        font=LABEL_FONT, corner_radius=CORNER)
+            self._entry2.pack(fill="x")
+
+        self._error = ctk.CTkLabel(body, text="", font=SMALL_FONT,
+                                   text_color="#DC2626", anchor="w")
+        self._error.pack(fill="x", pady=(6, 0))
+
+        btn_row = ctk.CTkFrame(container, fg_color="transparent")
+        btn_row.pack(fill="x", padx=24, pady=(0, 18))
+        ctk.CTkButton(btn_row, text="Cancel", font=BUTTON_FONT,
+                      corner_radius=CORNER, width=110, height=36,
+                      fg_color="transparent", border_width=1,
+                      border_color=GHOST_BORDER, text_color=GHOST_TEXT,
+                      hover_color=GHOST_HOVER, command=self._cancel
+                      ).pack(side="right", padx=(6, 0))
+        ctk.CTkButton(btn_row, text="OK", font=BUTTON_FONT,
+                      corner_radius=CORNER, width=110, height=36,
+                      command=self._submit).pack(side="right")
+
+        self._center()
+        self.transient(parent)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.bind("<Return>", lambda _e: self._submit())
+        self.bind("<Escape>", lambda _e: self._cancel())
+        self.after(60, self._entry.focus_set)
+        self._raise_to_front()
+        self.wait_window()
+
+    def _raise_to_front(self):
+        """Bring the dialog above the (possibly maximized) main window."""
+        try:
+            self.attributes("-topmost", True)
+            self.lift()
+            self.focus_force()
+            self.after(200, lambda: self.attributes("-topmost", False))
+        except Exception:
+            pass
+
+    def _submit(self):
+        pw = self._entry.get()
+        if not pw:
+            self._error.configure(text="Please enter a password.")
+            return
+        if self._confirm_field and pw != self._entry2.get():
+            self._error.configure(text="The two passwords do not match.")
+            return
+        self.result = pw
+        self.grab_release()
+        self.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.grab_release()
+        self.destroy()
+
+    def _center(self):
+        """Center on screen — works even when the main window is hidden."""
+        self.update_idletasks()
+        try:
+            w = self.winfo_width()
+            h = self.winfo_height()
+            sw = self.winfo_screenwidth()
+            sh = self.winfo_screenheight()
+            self.geometry("+{}+{}".format(
+                max((sw - w) // 2, 0),
+                max((sh - h) // 3, 0)))
+        except Exception:
+            pass
+
+
+def prompt_password(parent, title, message, confirm_field=False):
+    """Show a modal password box; return the entered string or None."""
+    return _PasswordDialog(parent, title, message,
+                           confirm_field=confirm_field).result
 
 
 # --------------------------------------------------------------------------- #
@@ -509,6 +649,8 @@ class RecordTable(ctk.CTkFrame):
         # --- Scrollable rows --------------------------------------------- #
         self.rows = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.rows.pack(fill="both", expand=True, padx=PAD, pady=(6, PAD))
+        # Hide the scrollbar immediately; _render will show it only when needed.
+        self.after(50, lambda: self._set_scrollbar_visible(False))
 
         self._all = []  # last fetched (unfiltered-by-client) records
         self._debounce_id = None   # pending after() id for debounced rebuilds
@@ -618,6 +760,7 @@ class RecordTable(ctk.CTkFrame):
             for r in self._row_pool:
                 r["frame"].pack_forget()
             self._empty_label.pack(pady=24)
+            self._set_scrollbar_visible(False)
             return
         self._empty_label.pack_forget()
 
@@ -632,6 +775,34 @@ class RecordTable(ctk.CTkFrame):
         # Hide any leftover rows from a previous, longer result set.
         for r in self._row_pool[len(rows):]:
             r["frame"].pack_forget()
+
+        # Show/hide the scrollbar after the layout has settled.
+        self.after(80, self._update_scrollbar_visibility)
+
+    def _set_scrollbar_visible(self, visible):
+        """Show or hide the CTkScrollableFrame's internal scrollbar."""
+        try:
+            sb = self.rows._scrollbar
+            if visible:
+                sb.grid()
+            else:
+                sb.grid_remove()
+        except Exception:
+            pass
+
+    def _update_scrollbar_visibility(self):
+        """Show the scrollbar only when content actually overflows the frame."""
+        try:
+            canvas = self.rows._parent_canvas
+            canvas.update_idletasks()
+            bbox = canvas.bbox("all")
+            content_h = (bbox[3] - bbox[1]) if bbox else 0
+            frame_h = canvas.winfo_height()
+            self._set_scrollbar_visible(content_h > frame_h and frame_h > 1)
+        except Exception:
+            # Fallback: keep scrollbar visible so users can always scroll.
+            self._set_scrollbar_visible(True)
+
 
     def _build_pooled_row(self):
         """Create one reusable row widget (frame + cell labels + action buttons)."""

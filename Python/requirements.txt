@@ -5,6 +5,7 @@ customtkinter==5.2.2     # modern themed widgets (draws its own UI)
 darkdetect==0.8.0        # pulled in by customtkinter; pinned for reproducibility
 pywin32==306             # win32print / win32ui / win32con for GDI printing (Windows only)
 Pillow==9.5.0            # logo image loading in the sidebar (last 3.8-friendly line)
+pycryptodome==3.20.0     # AES-256 encryption of the database file at rest (self-contained C, bundles with Nuitka)
 
 # Build-time only (not imported at runtime):
 nuitka==1.9.7            # compiles Python -> C -> native standalone build

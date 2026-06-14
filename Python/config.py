@@ -16,6 +16,9 @@ shared network folder, ...). That location is stored inside the config as
 Everything in here is plain stdlib so it works on a clean Python 3.8 install.
 """
 
+import binascii
+import hashlib
+import hmac
 import json
 import os
 
@@ -62,6 +65,13 @@ DEFAULTS = {
     "printer_name": "",           # empty => use the system default printer
     "font_name": "Arial",
     "font_size_pt": 11,
+    # App-open password. Stored as a PBKDF2-SHA256 hash + salt (never plaintext).
+    # Empty hash => no password set => the app opens without a prompt.
+    "password_hash": "",
+    "password_salt": "",
+    # Minutes of inactivity before the app re-locks (0 = never). Ignored when no
+    # password is set.
+    "lock_timeout_min": 5,
     # Per-form global calibration offsets (millimetres).
     "calibration": {
         "death":    {"x_mm": 0.0, "y_mm": 0.0},
@@ -206,3 +216,51 @@ class Config:
             "y_mm": float(y_mm),
         }
         self.save()
+
+    # -- app-open password ------------------------------------------------- #
+    _PBKDF2_ROUNDS = 200_000
+
+    def has_password(self):
+        """True if a password is configured (i.e. the app should prompt)."""
+        return bool(self._data.get("password_hash"))
+
+    @property
+    def lock_timeout_min(self):
+        try:
+            return int(self._data.get("lock_timeout_min", 5))
+        except (TypeError, ValueError):
+            return 5
+
+    @lock_timeout_min.setter
+    def lock_timeout_min(self, value):
+        self._data["lock_timeout_min"] = int(value)
+        self.save()
+
+    def set_password(self, plain):
+        """Set (or, with an empty value, clear) the app-open password."""
+        if not plain:
+            self._data["password_hash"] = ""
+            self._data["password_salt"] = ""
+            self.save()
+            return
+        salt = os.urandom(16)
+        dk = hashlib.pbkdf2_hmac(
+            "sha256", plain.encode("utf-8"), salt, self._PBKDF2_ROUNDS)
+        self._data["password_salt"] = binascii.hexlify(salt).decode("ascii")
+        self._data["password_hash"] = binascii.hexlify(dk).decode("ascii")
+        self.save()
+
+    def verify_password(self, plain):
+        """True if ``plain`` matches the stored password (or none is set)."""
+        stored = self._data.get("password_hash") or ""
+        salt_hex = self._data.get("password_salt") or ""
+        if not stored or not salt_hex:
+            return True  # no password configured
+        try:
+            salt = binascii.unhexlify(salt_hex)
+        except (binascii.Error, ValueError):
+            return False
+        dk = hashlib.pbkdf2_hmac(
+            "sha256", (plain or "").encode("utf-8"), salt, self._PBKDF2_ROUNDS)
+        return hmac.compare_digest(
+            binascii.hexlify(dk).decode("ascii"), stored)
