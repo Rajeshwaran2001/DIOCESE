@@ -34,16 +34,20 @@ _SHEET_FIELDS = [
     ("father_name",                "Father's Name",              False, False),
     ("mother_name",                "Mother's Name",              False, False),
     ("trade_or_profession",        "Trade or Profession",        False, False),
-    ("names_of_godparents",        "Names of God-Parents",       False, False),
-    ("where_baptized",             "Where Baptized",             False, False),
+    ("names_of_godparents",        "Names of God-Parents (1)",   False, False),
+    ("names_of_godparents_2",      "Names of God-Parents (2)",   False, False),
+    ("names_of_godparents_3",      "Names of God-Parents (3)",   False, False),
     ("signature_by_whom_baptized", "Signature by Whom Baptized", False, False),
+    ("where_baptized",             "Where Baptized",             False, False),
 ]
 
 # Closing certificate paragraph + footer.
 _FOOTER = [
-    ("baptized_by_name", "Mr / Rev. (baptized by)", False),
+    ("baptized_by_name", "Diocesan Registrar Name", False),
+    ("pastorate_name", "Church Name", False),
     ("witness_day", "Witness Date - Day", False),
-    ("witness_month_year", "Witness Date - Month & Year", False),
+    ("witness_month", "Witness Date - Month", False),
+    ("witness_year", "Witness Date - Year", False),
 ]
 
 _REQUIRED = [("number", "Number"), ("christian_name", "Christian Name")]

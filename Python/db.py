@@ -50,9 +50,9 @@ MARRIAGE_PARTY_FIELDS = [
 BAPTISM_FIELDS = [
     "number", "when_baptized", "said_to_be_born", "christian_name",
     "surname_former_name", "sex", "father_name", "mother_name",
-    "trade_or_profession", "names_of_godparents", "where_baptized",
-    "signature_by_whom_baptized", "baptized_by_name",
-    "witness_day", "witness_month_year",
+    "trade_or_profession", "names_of_godparents", "names_of_godparents_2",
+    "names_of_godparents_3", "signature_by_whom_baptized", "where_baptized",
+    "baptized_by_name", "pastorate_name", "witness_day", "witness_month", "witness_year",
 ]
 
 
@@ -178,8 +178,11 @@ class Database:
             pass
 
         try:
-            cur.execute("ALTER TABLE baptism ADD COLUMN witness_day TEXT")
-            cur.execute("ALTER TABLE baptism ADD COLUMN witness_month_year TEXT")
+            cur.execute("ALTER TABLE baptism ADD COLUMN names_of_godparents_2 TEXT")
+            cur.execute("ALTER TABLE baptism ADD COLUMN names_of_godparents_3 TEXT")
+            cur.execute("ALTER TABLE baptism ADD COLUMN pastorate_name TEXT")
+            cur.execute("ALTER TABLE baptism ADD COLUMN witness_month TEXT")
+            cur.execute("ALTER TABLE baptism ADD COLUMN witness_year TEXT")
         except sqlite3.OperationalError:
             pass
 
