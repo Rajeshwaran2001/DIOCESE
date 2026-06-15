@@ -138,7 +138,7 @@ BAPTISM_LAYOUT = {
     "where_baptized":            (_B_VALUE_X, 158.0),
     # certifying paragraph + footer
     "baptized_by_name":          (33.0, 174.0),   # Diocesan Registrar Name
-    "pastorate_name":            (14.0, 184.0),
+    "pastorate_name":            (14.0, 187.0),
     "witness_day":               (74.0, 209.0),
     "witness_month":             (136.0, 209.0),
     "witness_year":              (17.0, 216.0),
