@@ -93,10 +93,10 @@ MARRIAGE_LAYOUT = {
     "signature_of_licensee":(_M_VALUE_X, 140.0),
     "place_solemnized":     (_M_VALUE_X, 159.0),
     # certifying paragraph + footer
-    "registrar_name":       (10.0, 169.0),
-    "witness_day":          (52.0, 213.0),
-    "witness_month":        (100.0, 215.0),
-    "witness_year":         (167.0, 214.0),
+    "registrar_name":       (11.0, 169.0),
+    "witness_day":          (55.0, 213.0),
+    "witness_month":        (104.0, 215.0),
+    "witness_year":         (168.0, 214.0),
 }
 
 # Per-party fields: each maps to a y_mm; the engine uses PARTY_A_X / PARTY_B_X.
@@ -119,7 +119,7 @@ MARRIAGE_PARTY_X = {"A": _M_PARTY_A_X, "B": _M_PARTY_B_X}
 # FORM 3 — BAPTISM CERTIFICATE  (portrait)
 # Pre-printed header "DIOCESE OF MADURA-RAMNAD - CSI / BAPTISM CERTIFICATE"
 # =========================================================================== #
-_B_VALUE_X = 88.0
+_B_VALUE_X = 90.0
 
 BAPTISM_LAYOUT = {
     "number":                    (_B_VALUE_X, 38.0),
@@ -137,10 +137,10 @@ BAPTISM_LAYOUT = {
     "signature_by_whom_baptized":(_B_VALUE_X, 148.0),
     "where_baptized":            (_B_VALUE_X, 158.0),
     # certifying paragraph + footer
-    "baptized_by_name":          (32.0, 174.0),   # Diocesan Registrar Name
-    "pastorate_name":            (16.0, 185.0),
-    "witness_day":               (72.0, 209.0),
-    "witness_month":             (135.0, 209.0),
+    "baptized_by_name":          (33.0, 174.0),   # Diocesan Registrar Name
+    "pastorate_name":            (16.0, 184.0),
+    "witness_day":               (74.0, 209.0),
+    "witness_month":             (136.0, 209.0),
     "witness_year":              (17.0, 216.0),
 }
 
