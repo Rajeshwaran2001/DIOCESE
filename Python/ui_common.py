@@ -154,7 +154,7 @@ class _ModalDialog(ctk.CTkToplevel):
         self._center(parent)
         self.transient(parent)
         self.grab_set()
-        self.protocol("WM_DELETE_WINDOW", lambda: self._choose(buttons[0]))
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
         self._raise_to_front()
         self.wait_window()
 
@@ -170,6 +170,12 @@ class _ModalDialog(ctk.CTkToplevel):
 
     def _choose(self, label):
         self.result = label
+        self.grab_release()
+        self.destroy()
+
+    def _cancel(self):
+        """Close the dialog without a selection (✕ button or Escape)."""
+        self.result = None
         self.grab_release()
         self.destroy()
 

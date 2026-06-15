@@ -18,6 +18,7 @@ Build with: build.bat  (Nuitka standalone)
 import os
 import sys
 import glob
+import math
 import time
 import tkinter as tk
 from tkinter import filedialog
@@ -81,10 +82,12 @@ SIDEBAR_ACTIVE = ("#2563EB", "#3B82F6")    # accent highlight
 SIDEBAR_TEXT = "#E2E8F0"
 SIDEBAR_TEXT_DIM = "#94A3B8"
 
+# Nav item definitions: (section_name, display_label, icon_key)
+# Icons are canvas-drawn PhotoImages (no emoji / font dependency).
 NAV_ITEMS = [
-    ("death", "Death", "🕮"),
-    ("marriage", "Marriage", "💍"),
-    ("baptism", "Baptism", "✝"),
+    ("death",    "Death",    "death"),
+    ("marriage", "Marriage", "marriage"),
+    ("baptism",  "Baptism",  "baptism"),
 ]
 
 
@@ -444,8 +447,13 @@ class App(ctk.CTk):
     def _toggle_theme(self):
         new = "dark" if self.config.theme == "light" else "light"
         self.set_theme(new)
-        self.theme_btn.configure(
-            text=("🌙  Dark mode" if new == "light" else "☀  Light mode"))
+        # Swap icon and label (no emoji — canvas-drawn icons)
+        theme_key   = "theme_dark"  if new == "light" else "theme_light"
+        theme_label = "  Dark mode" if new == "light" else "  Light mode"
+        t_img  = self._nav_icons.get(theme_key)
+        t_icon = ctk.CTkImage(light_image=t_img, dark_image=t_img,
+                              size=(18, 18)) if t_img else None
+        self.theme_btn.configure(text=theme_label, image=t_icon)
 
     # ------------------------------------------------------------------ #
     # Layout: sidebar + content
@@ -540,6 +548,11 @@ class App(ctk.CTk):
         ctk.CTkFrame(self.sidebar, height=1, fg_color="#334155"
                      ).grid(row=0, column=0, sticky="sew", padx=16)
 
+        # Pre-render all nav icons once and store them as instance attributes
+        # so they are not garbage-collected (Tk drops unreferenced PhotoImages).
+        self._nav_icons = {}
+        self._build_nav_icons()
+
     @staticmethod
     def _draw_logo(parent):
         """Vector-draw the cross emblem on a small Canvas (no image files)."""
@@ -562,6 +575,77 @@ class App(ctk.CTk):
         canvas.create_rectangle(size * 0.30, size * 0.40, size * 0.70, size * 0.40 + 6,
                                 fill="white", outline="")
 
+    def _build_nav_icons(self):
+        """Pre-render sidebar nav icons as PIL Images for CTkImage.
+
+        CTkImage requires PIL.Image objects (not tk.PhotoImage).
+        We use PIL.Image RGBA + ImageDraw — Pillow is already a project
+        dependency (Pillow==9.5.0) so no new requirement is added.
+        """
+        from PIL import Image, ImageDraw
+
+        SIZE = 20
+        FG   = (203, 213, 225, 255)   # #CBD5E1 light slate
+        NONE = (0, 0, 0, 0)           # transparent
+
+        def blank():
+            return Image.new("RGBA", (SIZE, SIZE), NONE)
+
+        # ── Death: open book ────────────────────────────────────────────────
+        img = blank()
+        d = ImageDraw.Draw(img)
+        d.rectangle([1, 3, 18, 16], outline=FG, width=1)   # outer rectangle
+        d.line([(10, 4), (10, 15)], fill=FG, width=1)       # centre spine
+        for y in (7, 9, 11):                                 # text lines
+            d.line([(3, y), (8, y)],  fill=FG, width=1)     #   left page
+            d.line([(12, y), (17, y)], fill=FG, width=1)    #   right page
+        self._nav_icons["death"] = img
+
+        # ── Marriage: two interlocking rings ─────────────────────────────────
+        img = blank()
+        d = ImageDraw.Draw(img)
+        d.ellipse([ 1, 5,  9, 14], outline=FG, width=2)
+        d.ellipse([10, 5, 18, 14], outline=FG, width=2)
+        self._nav_icons["marriage"] = img
+
+        # ── Baptism: water droplet ────────────────────────────────────────────
+        img = blank()
+        d = ImageDraw.Draw(img)
+        d.polygon([(10, 2), (16, 11), (14, 16), (6, 16), (4, 11)], fill=FG)
+        d.ellipse([7, 11, 12, 15], fill=NONE)   # highlight cut-out
+        self._nav_icons["baptism"] = img
+
+        # ── Settings: gear ────────────────────────────────────────────────────
+        img = blank()
+        d = ImageDraw.Draw(img)
+        cx, cy = 10, 10
+        for a in range(0, 360, 45):
+            rad = math.radians(a)
+            d.line([(cx + int(4 * math.cos(rad)), cy + int(4 * math.sin(rad))),
+                    (cx + int(7 * math.cos(rad)), cy + int(7 * math.sin(rad)))],
+                   fill=FG, width=2)
+        d.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=FG)   # hub
+        self._nav_icons["settings"] = img
+
+        # ── Sun: shown in dark mode (click → light mode) ─────────────────────
+        img = blank()
+        d = ImageDraw.Draw(img)
+        cx, cy = 10, 10
+        d.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=FG)
+        for a in range(0, 360, 45):
+            rad = math.radians(a)
+            d.line([(cx + int(5 * math.cos(rad)), cy + int(5 * math.sin(rad))),
+                    (cx + int(8 * math.cos(rad)), cy + int(8 * math.sin(rad)))],
+                   fill=FG, width=1)
+        self._nav_icons["theme_light"] = img
+
+        # ── Moon crescent: shown in light mode (click → dark mode) ───────────
+        img = blank()
+        d = ImageDraw.Draw(img)
+        d.ellipse([3, 3, 16, 16], fill=FG)       # full disc
+        d.ellipse([8, 1, 19, 14], fill=NONE)     # punch-out → crescent
+        self._nav_icons["theme_dark"] = img
+
     def _build_nav(self):
         nav = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         nav.grid(row=1, column=0, sticky="new", padx=12, pady=(12, 0))
@@ -570,12 +654,21 @@ class App(ctk.CTk):
                      text_color=SIDEBAR_TEXT_DIM, anchor="w"
                      ).pack(fill="x", padx=8, pady=(0, 6))
 
-        for name, label, icon in NAV_ITEMS:
-            self.nav_buttons[name] = self._nav_button(nav, name, label, icon)
+        for name, label, icon_key in NAV_ITEMS:
+            self.nav_buttons[name] = self._nav_button(nav, name, label, icon_key)
 
-    def _nav_button(self, parent, name, label, icon):
+    def _nav_button(self, parent, name, label, icon_key):
+        """Create a sidebar nav button with a canvas-drawn icon (no emoji)."""
+        icon_img = self._nav_icons.get(icon_key)
+        # CTkImage wraps a light/dark pair; we only have one monochrome image
+        # so supply it for both modes.
+        ctk_icon = ctk.CTkImage(light_image=icon_img, dark_image=icon_img,
+                                size=(18, 18)) if icon_img else None
         btn = ctk.CTkButton(
-            parent, text="  {}   {}".format(icon, label),
+            parent,
+            text="   {}".format(label),
+            image=ctk_icon,
+            compound="left",
             anchor="w", font=(ui_common.FONT_FAMILY, 15),
             height=46, corner_radius=10,
             fg_color="transparent", hover_color=SIDEBAR_ITEM_HOVER,
@@ -589,17 +682,30 @@ class App(ctk.CTk):
         footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         footer.grid(row=3, column=0, sticky="sew", padx=12, pady=(0, 16))
 
+        gear_img  = self._nav_icons.get("settings")
+        gear_icon = ctk.CTkImage(light_image=gear_img, dark_image=gear_img,
+                                 size=(18, 18)) if gear_img else None
         self.nav_buttons["settings"] = ctk.CTkButton(
-            footer, text="  ⚙   Settings", anchor="w",
+            footer, text="   Settings",
+            image=gear_icon, compound="left",
+            anchor="w",
             font=(ui_common.FONT_FAMILY, 15), height=46, corner_radius=10,
             fg_color="transparent", hover_color=SIDEBAR_ITEM_HOVER,
             text_color=SIDEBAR_TEXT,
             command=lambda: self.show_section("settings"))
         self.nav_buttons["settings"].pack(fill="x", pady=3)
 
+        # Pick moon icon for light mode ("switch to dark"), sun for dark mode.
+        is_light = self.config.theme == "light"
+        theme_key   = "theme_dark"  if is_light else "theme_light"
+        theme_label = "  Dark mode" if is_light else "  Light mode"
+        t_img  = self._nav_icons.get(theme_key)
+        t_icon = ctk.CTkImage(light_image=t_img, dark_image=t_img,
+                              size=(18, 18)) if t_img else None
         self.theme_btn = ctk.CTkButton(
             footer,
-            text=("🌙  Dark mode" if self.config.theme == "light" else "☀  Light mode"),
+            text=theme_label,
+            image=t_icon, compound="left",
             anchor="w", font=(ui_common.FONT_FAMILY, 14), height=42, corner_radius=10,
             fg_color="transparent", hover_color=SIDEBAR_ITEM_HOVER,
             text_color=SIDEBAR_TEXT_DIM, command=self._toggle_theme)

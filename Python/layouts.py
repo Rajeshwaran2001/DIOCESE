@@ -89,28 +89,28 @@ MARRIAGE_LAYOUT = {
     # --- shared (single value) fields ---
     # Note: "S.No." is pre-printed on the sheet, so it is NOT printed by us.
     "number":               (_M_VALUE_X, 47.0),
-    "when_married":         (_M_VALUE_X, 57.0),
-    "signature_of_licensee":(_M_VALUE_X, 142.0),
-    "place_solemnized":     (_M_VALUE_X, 162.0),
+    "when_married":         (_M_VALUE_X, 56.0),
+    "signature_of_licensee":(_M_VALUE_X, 140.0),
+    "place_solemnized":     (_M_VALUE_X, 159.0),
     # certifying paragraph + footer
-    "registrar_name":       (10.0, 171.0),
-    "witness_day":          (50.0, 214.0),
-    "witness_month":        (98.0, 214.0),
-    "witness_year":         (166.0, 214.0),
+    "registrar_name":       (10.0, 169.0),
+    "witness_day":          (52.0, 213.0),
+    "witness_month":        (100.0, 215.0),
+    "witness_year":         (167.0, 214.0),
 }
 
 # Per-party fields: each maps to a y_mm; the engine uses PARTY_A_X / PARTY_B_X.
 MARRIAGE_PARTY_LAYOUT = {
     # field                       : y_mm
-    "name_of_party":               67.0,
-    "surname":                     77.0,
-    "age":                         86.0,
-    "condition":                   96.0,
-    "rank_or_profession":          106.0,
-    "residence_at_marriage":       113.0,
-    "fathers_name":                123.0,
-    "signature_contracting_party": 132.0,
-    "witness_signature":           152.0,
+    "name_of_party":               65.0,
+    "surname":                     73.0,
+    "age":                         83.0,
+    "condition":                   93.0,
+    "rank_or_profession":          102.0,
+    "residence_at_marriage":       112.0,
+    "fathers_name":                120.0,
+    "signature_contracting_party": 131.0,
+    "witness_signature":           150.0,
 }
 MARRIAGE_PARTY_X = {"A": _M_PARTY_A_X, "B": _M_PARTY_B_X}
 
@@ -119,29 +119,29 @@ MARRIAGE_PARTY_X = {"A": _M_PARTY_A_X, "B": _M_PARTY_B_X}
 # FORM 3 — BAPTISM CERTIFICATE  (portrait)
 # Pre-printed header "DIOCESE OF MADURA-RAMNAD - CSI / BAPTISM CERTIFICATE"
 # =========================================================================== #
-_B_VALUE_X = 86.0
+_B_VALUE_X = 88.0
 
 BAPTISM_LAYOUT = {
-    "number":                    (_B_VALUE_X, 40.0),
-    "when_baptized":             (_B_VALUE_X, 49.0),
+    "number":                    (_B_VALUE_X, 38.0),
+    "when_baptized":             (_B_VALUE_X, 47.0),
     "said_to_be_born":           (_B_VALUE_X, 57.0),
-    "christian_name":            (_B_VALUE_X, 67.0),
-    "surname_former_name":       (_B_VALUE_X, 77.0),
-    "sex":                       (_B_VALUE_X, 86.0),
-    "father_name":               (_B_VALUE_X, 95.0),
-    "mother_name":               (_B_VALUE_X, 104.0),
-    "trade_or_profession":       (_B_VALUE_X, 114.0),
-    "names_of_godparents":       (_B_VALUE_X, 122.0),
-    "names_of_godparents_2":     (_B_VALUE_X, 132.0),
-    "names_of_godparents_3":     (_B_VALUE_X, 142.0),
-    "signature_by_whom_baptized":(_B_VALUE_X, 151.0),
-    "where_baptized":            (_B_VALUE_X, 160.0),
+    "christian_name":            (_B_VALUE_X, 66.0),
+    "surname_former_name":       (_B_VALUE_X, 72.0),
+    "sex":                       (_B_VALUE_X, 84.0),
+    "father_name":               (_B_VALUE_X, 93.0),
+    "mother_name":               (_B_VALUE_X, 103.0),
+    "trade_or_profession":       (_B_VALUE_X, 111.0),
+    "names_of_godparents":       (_B_VALUE_X, 120.0),
+    "names_of_godparents_2":     (_B_VALUE_X, 130.0),
+    "names_of_godparents_3":     (_B_VALUE_X, 139.0),
+    "signature_by_whom_baptized":(_B_VALUE_X, 148.0),
+    "where_baptized":            (_B_VALUE_X, 158.0),
     # certifying paragraph + footer
-    "baptized_by_name":          (31.0, 176.0),   # Diocesan Registrar Name
-    "pastorate_name":            (16.0, 188.0),
-    "witness_day":               (50.0, 211.0),
-    "witness_month":             (98.0, 211.0),
-    "witness_year":              (17.0, 218.0),
+    "baptized_by_name":          (32.0, 174.0),   # Diocesan Registrar Name
+    "pastorate_name":            (16.0, 185.0),
+    "witness_day":               (72.0, 209.0),
+    "witness_month":             (135.0, 209.0),
+    "witness_year":              (17.0, 216.0),
 }
 
 
