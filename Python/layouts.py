@@ -88,29 +88,29 @@ _M_PARTY_B_X = 150.0  # X for Party B column
 MARRIAGE_LAYOUT = {
     # --- shared (single value) fields ---
     # Note: "S.No." is pre-printed on the sheet, so it is NOT printed by us.
-    "number":               (_M_VALUE_X, 47.0),
-    "when_married":         (_M_VALUE_X, 56.0),
-    "signature_of_licensee":(_M_VALUE_X, 140.0),
-    "place_solemnized":     (_M_VALUE_X, 159.0),
+    "number":               (_M_VALUE_X, 45.0),
+    "when_married":         (_M_VALUE_X, 55.0),
+    "signature_of_licensee":(_M_VALUE_X, 139.0),
+    "place_solemnized":     (_M_VALUE_X, 158.0),
     # certifying paragraph + footer
-    "registrar_name":       (11.0, 169.0),
-    "witness_day":          (55.0, 213.0),
-    "witness_month":        (104.0, 215.0),
-    "witness_year":         (168.0, 214.0),
+    "registrar_name":       (11.0, 168.0),
+    "witness_day":          (55.0, 212.0),
+    "witness_month":        (104.0, 212.0),
+    "witness_year":         (168.0, 212.0),
 }
 
 # Per-party fields: each maps to a y_mm; the engine uses PARTY_A_X / PARTY_B_X.
 MARRIAGE_PARTY_LAYOUT = {
     # field                       : y_mm
-    "name_of_party":               65.0,
+    "name_of_party":               64.0,
     "surname":                     73.0,
-    "age":                         83.0,
+    "age":                         82.0,
     "condition":                   93.0,
     "rank_or_profession":          102.0,
     "residence_at_marriage":       112.0,
     "fathers_name":                120.0,
-    "signature_contracting_party": 131.0,
-    "witness_signature":           150.0,
+    "signature_contracting_party": 129.0,
+    "witness_signature":           148.0,
 }
 MARRIAGE_PARTY_X = {"A": _M_PARTY_A_X, "B": _M_PARTY_B_X}
 
